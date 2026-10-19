@@ -86,6 +86,13 @@ const REJECTION_TAGS: ReadonlySet<unknown> = new Set([
   'LockNotAcquiredError',
 ])
 
+/**
+ * Any thenable, not only native promises of this realm (`instanceof Promise`).
+ */
+function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return typeof (value as { then?: unknown } | null | undefined)?.then === 'function'
+}
+
 function defaultClassify(result: AnyResult): CallOutcome {
   if (result.ok) return 'success'
   return REJECTION_TAGS.has((result.error as { _tag?: unknown } | null)?._tag)
@@ -242,7 +249,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
     }
     const admitted = this.#store.admit(this.#clock.now(), this.config)
     // the memory store is synchronous: awaiting its values costs microtask hops on every call
-    const admission = admitted instanceof Promise ? await admitted : admitted
+    const admission = isThenable(admitted) ? await admitted : admitted
     if (this.#tracks(context)) await this.#notify(context)
     if (!admission.admitted) {
       const { state, retryAfterMs } = admission
@@ -257,7 +264,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
       return result
     } finally {
       const recorded = this.#store.record(admission.ticket, outcome, this.#clock.now(), this.config)
-      if (recorded instanceof Promise) await recorded
+      if (isThenable(recorded)) await recorded
       if (this.#tracks(context)) await this.#notify(context)
     }
   }

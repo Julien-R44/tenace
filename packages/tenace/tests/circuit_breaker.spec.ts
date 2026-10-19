@@ -364,6 +364,27 @@ test.group('CircuitBreaker | store and options', () => {
     assert.throws(() => breaker.state, TypeError)
   })
 
+  test('awaits stores returning thenables that are not native promises', async ({ assert }) => {
+    const memory = new MemoryCircuitBreakerStore()
+    // runs the operation only once awaited, like a lazy query builder
+    const lazy = <T>(run: () => T): Promise<T> =>
+      // oxlint-disable-next-line unicorn/no-thenable
+      ({ then: (resolve: (value: T) => void) => resolve(run()) }) as unknown as Promise<T>
+    const store: CircuitBreakerStore = {
+      admit: (...args) => lazy(() => memory.admit(...args)),
+      record: (...args) => lazy(() => memory.record(...args)),
+      isolate: (...args) => lazy(() => memory.isolate(...args)),
+      release: (...args) => lazy(() => memory.release(...args)),
+      state: (...args) => lazy(() => memory.state(...args)),
+    }
+    const breaker = new CircuitBreaker({ trip: { consecutive: 1 }, store })
+    const policy = Tenace.policy().with(breaker)
+
+    assert.equal(await policy.execute(() => 'value'), 'value')
+    await policy.settle(fail)
+    assert.equal(memory.state(Date.now(), breaker.config), 'open')
+  })
+
   test('a custom store can be written with the exported state machine', async ({ assert }) => {
     // a key-value store holding the state as JSON, like Redis would
     const rows = new Map<string, string>()
