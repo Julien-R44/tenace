@@ -10,7 +10,7 @@ export default defineConfig({
         'Typed, composable resilience policies for TypeScript: timeout, retry, circuit breaker, bulkhead, fallback and more.',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/julien-r44/tenace' }],
       routeMiddleware: './src/route-middleware.ts',
-      editLink: { baseUrl: 'https://github.com/julien-r44/tenace/edit/v2/docs/' },
+      editLink: { baseUrl: 'https://github.com/julien-r44/tenace/edit/main/docs/' },
       lastUpdated: true,
       logo: { src: './src/assets/logo.svg' },
       customCss: [

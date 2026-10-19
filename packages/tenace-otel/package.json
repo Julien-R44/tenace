@@ -9,6 +9,7 @@
     "tenace",
     "tracing"
   ],
+  "homepage": "https://tenace.julr.dev",
   "license": "MIT",
   "author": "Julien Ripouteau <julien@ripouteau.com>",
   "repository": {
