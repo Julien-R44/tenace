@@ -30,8 +30,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public",
-    "tag": "next"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
@@ -39,6 +38,7 @@
     "typecheck:ts5": "node ./node_modules/typescript-5/bin/tsc --noEmit",
     "test": "node --conditions=tenace-source --import=@poppinss/ts-exec --enable-source-maps bin/test.ts",
     "test:bun": "bun --conditions=tenace-source bin/test.ts",
+    "release": "release-it",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
@@ -50,16 +50,50 @@
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@poppinss/ts-exec": "catalog:",
+    "@release-it/conventional-changelog": "^12.0.2",
     "@types/node": "catalog:",
+    "release-it": "^21.1.1",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "typescript-5": "catalog:"
   },
   "peerDependencies": {
-    "@julr/tenace": "workspace:^",
+    "@julr/tenace": "^2.0.0",
     "@opentelemetry/api": "^1.9.0"
   },
   "engines": {
     "node": ">=22.18.0"
+  },
+  "release-it": {
+    "git": {
+      "requireCleanWorkingDir": true,
+      "requireUpstream": true,
+      "commitMessage": "chore(release): @julr/tenace-otel@${version}",
+      "tagName": "tenace-otel@v${version}",
+      "tagAnnotation": "tenace-otel@v${version}",
+      "push": true
+    },
+    "github": {
+      "release": true,
+      "releaseName": "@julr/tenace-otel@${version}",
+      "makeLatest": false
+    },
+    "npm": {
+      "publish": true,
+      "skipChecks": true,
+      "publishPackageManager": "pnpm",
+      "publishArgs": [
+        "--no-git-checks"
+      ]
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": {
+          "name": "angular"
+        },
+        "path": ".",
+        "tagPrefix": "tenace-otel@v"
+      }
+    }
   }
 }

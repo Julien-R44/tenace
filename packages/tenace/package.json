@@ -50,8 +50,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public",
-    "tag": "next"
+    "access": "public"
   },
   "scripts": {
     "clean": "del-cli build",
@@ -95,7 +94,11 @@
     },
     "npm": {
       "publish": true,
-      "skipChecks": true
+      "skipChecks": true,
+      "publishPackageManager": "pnpm",
+      "publishArgs": [
+        "--no-git-checks"
+      ]
     },
     "plugins": {
       "@release-it/conventional-changelog": {

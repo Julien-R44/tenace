@@ -228,6 +228,17 @@ pnpm docs:dev # documentation on http://localhost:4321
 
 The documentation is an [Astro Starlight](https://starlight.astro.build) site in [`docs/`](./docs). `pnpm typecheck` also typechecks the TypeScript blocks of the documentation and of the READMEs against the sources. Mark a block that is not valid on its own with ` ```ts nocheck `.
 
+### Releasing
+
+Each package is released with [release-it](https://github.com/release-it/release-it) from its own directory (version bump, commit, tag, `pnpm publish`, push, GitHub release). Release `@julr/tenace` first, then `@julr/tenace-otel`:
+
+```sh
+cd packages/tenace && pnpm release        # tag v<version>
+cd ../tenace-otel && pnpm release         # tag tenace-otel@v<version>
+```
+
+Always publish with pnpm (`pnpm release` does): it replaces `workspace:` and `catalog:` specifiers with real ranges, `npm publish` is refused. Bump the `@julr/tenace` peer range of `@julr/tenace-otel` by hand when it needs a newer core.
+
 ## License
 
 MIT
