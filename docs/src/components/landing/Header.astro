@@ -46,7 +46,7 @@ const links = [
 
 <style>
   /* Transparent over the hero, with a scrim so the links stay readable on the image */
-  :global(header.header) {
+  :global([data-has-hero] header.header) {
     border-bottom-color: transparent;
     background: linear-gradient(to bottom, rgb(7 8 10 / 0.85), rgb(7 8 10 / 0));
     backdrop-filter: none;
@@ -55,7 +55,7 @@ const links = [
       background-color 200ms ease-out,
       border-color 200ms ease-out;
   }
-  :global(header.header[data-scrolled]) {
+  :global([data-has-hero] header.header[data-scrolled]) {
     border-bottom-color: var(--tn-hairline);
     background: rgb(7 8 10 / 0.75);
     backdrop-filter: saturate(140%) blur(14px);
@@ -168,7 +168,7 @@ const links = [
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(header.header) {
+    :global([data-has-hero] header.header) {
       transition: none;
     }
   }

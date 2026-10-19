@@ -81,7 +81,7 @@ header.header {
   color: var(--sl-color-white);
 }
 .site-title img {
-  height: 1.75rem;
+  height: 1.25rem;
 }
 
 site-search button[data-open-modal] {
@@ -178,9 +178,10 @@ starlight-toc a[aria-current='true'] {
   color: var(--sl-color-white);
 }
 
-/* Page title */
-.content-panel {
-  border-top-color: var(--tn-hairline);
+/* Page title, without the hairline Starlight draws between it and the content */
+.content-panel + .content-panel {
+  border-top: 0;
+  padding-top: 0;
 }
 :root:not([data-has-hero]) h1#_top {
   font-size: var(--sl-text-h1);
@@ -233,6 +234,13 @@ starlight-toc a[aria-current='true'] {
   border-spacing: 0;
   border: 1px solid var(--tn-hairline);
   border-radius: 0.625rem;
+}
+/* Starlight makes tables scrollable blocks, which leaves rows narrower than the border on wide screens */
+@media (min-width: 80rem) {
+  .sl-markdown-content table:not(:where(.not-content *)) {
+    display: table;
+    width: 100%;
+  }
 }
 .sl-markdown-content :is(th, td) {
   padding: 0.6rem 0.875rem;
