@@ -73,7 +73,7 @@ export class Bulkhead extends Strategy<BulkheadFullError> {
 
   async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
     const release = await this.#scheduler.acquire({
-      signal: context.signal,
+      ...(context.abortable && { signal: context.signal }),
       clock: context.clock,
       ...(this.#maxWaitMs !== undefined && { maxWaitMs: this.#maxWaitMs }),
     })

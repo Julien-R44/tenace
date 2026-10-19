@@ -520,6 +520,8 @@ export class Policy<
       ...(options?.clock && { clock: options.clock }),
       key: options?.key,
       idempotent: options?.idempotent ?? true,
+      // nobody holds the controller of the signal created here
+      abortable: signal !== undefined,
     })
     const chain = this.#chain(fn)
     // the abort is raced inside the instrumented run, so instrumentations see it

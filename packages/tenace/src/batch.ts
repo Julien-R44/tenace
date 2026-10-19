@@ -73,7 +73,7 @@ export class Batch<Values extends readonly unknown[], Results extends readonly u
   #run(options: BatchRunOptions, failFast: boolean, runner: Runner): Promise<unknown[]> {
     options.signal?.throwIfAborted()
     const tasks = this.#tasks
-    const link = linkSignal(options.signal ?? new AbortController().signal)
+    const link = linkSignal(options.signal)
     const runOptions = { signal: link.signal, ...(options.clock && { clock: options.clock }) }
     const outputs: unknown[] = Array.from({ length: tasks.length })
     let failed = false

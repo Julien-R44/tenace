@@ -38,7 +38,7 @@ export class Timeout extends Strategy<TimeoutError> {
   async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
     if (this.timeoutMs === Number.POSITIVE_INFINITY) return next(context)
 
-    const link = linkSignal(context.signal)
+    const link = linkSignal(context.abortable ? context.signal : undefined)
     const error = new TimeoutError(this.timeoutMs)
     let timedOut = false
     let onDeadline: ((result: AnyResult) => void) | undefined
@@ -54,7 +54,8 @@ export class Timeout extends Strategy<TimeoutError> {
       const inner = next(context.with({ signal: link.signal }))
       let result: AnyResult
       if (this.mode === 'aggressive') {
-        result = await raceSignal(Promise.race([inner, deadline]), context.signal)
+        const raced = Promise.race([inner, deadline])
+        result = await (context.abortable ? raceSignal(raced, context.signal) : raced)
         // a defect after the race was decided can no longer reject the execution
         void inner.catch(reportError)
       } else {

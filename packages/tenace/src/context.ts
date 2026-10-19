@@ -23,6 +23,7 @@ export interface ExecutionContextInit {
   readonly scope?: ExecutionScope
   readonly key?: string | undefined
   readonly idempotent?: boolean
+  readonly abortable?: boolean
 }
 
 /**
@@ -47,6 +48,11 @@ export class ExecutionContext implements Context {
    * `false` when the function must not run twice (`execute(fn, { idempotent: false })`).
    */
   readonly idempotent: boolean
+  /**
+   * `false` when nothing can abort `signal` (no caller signal, no timeout or batch around),
+   * so strategies can skip listening to it. Defaults to `true`.
+   */
+  readonly abortable: boolean
 
   constructor(init: ExecutionContextInit) {
     this.signal = init.signal
@@ -55,6 +61,7 @@ export class ExecutionContext implements Context {
     this.scope = init.scope ?? noopScope
     this.key = init.key
     this.idempotent = init.idempotent ?? true
+    this.abortable = init.abortable ?? true
     Object.freeze(this)
   }
 
@@ -80,6 +87,8 @@ export class ExecutionContext implements Context {
       scope: patch.scope ?? this.scope,
       key: 'key' in patch ? patch.key : this.key,
       idempotent: patch.idempotent ?? this.idempotent,
+      // a new signal comes from something that can abort it (a timeout, a batch)
+      abortable: patch.abortable ?? (patch.signal ? true : this.abortable),
     })
   }
 }
