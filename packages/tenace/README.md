@@ -236,6 +236,17 @@ const results = await Tenace.map(ids, id => getUser(id), { policy }).settle() //
 - **`execute()`** is fail-fast: the first failure rejects, aborts the running tasks and skips the others.
 - **`settle()`** runs every task.
 
+## Wait for a condition
+
+```ts
+import { waitFor } from '@julr/tenace'
+
+await waitFor(async ({ signal }) => (await fetch(healthUrl, { signal })).ok, {
+  interval: '500ms', // or a backoff
+  timeout: '30s', // then rejects with a TimeoutError
+})
+```
+
 ## Custom strategies
 
 ```ts

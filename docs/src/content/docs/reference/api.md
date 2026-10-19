@@ -16,14 +16,15 @@ description: The Tenace entry point, the Policy methods, execution options, and 
 
 ## Tenace
 
-| Method                                   | Returns      | Description                                                                              |
-| ---------------------------------------- | ------------ | ---------------------------------------------------------------------------------------- |
-| `Tenace.policy<E>(options?)`             | `Policy`     | A reusable policy. `E` declares errors the functions may return, for the callbacks.      |
-| `Tenace.call(fn, options?)`              | `Policy`     | A policy bound to `fn`. Throws a `TypeError` when `fn` is not a function.                |
-| `Tenace.all(tasks, options?)`            | `Batch`      | Runs `tasks` through a policy. See [Batches](/guides/batches/).                          |
-| `Tenace.map(items, fn, options?)`        | `Batch`      | Runs `fn(item, context, index)` for each item through a policy.                          |
-| `Tenace.instrument(...instrumentations)` | `() => void` | Sets the default instrumentation. Returns a function that removes this setting.          |
-| `Tenace.chaos(options)`                  | `() => void` | Injects faults around every function call. Returns a function that removes this setting. |
+| Method                                   | Returns         | Description                                                                               |
+| ---------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| `Tenace.policy<E>(options?)`             | `Policy`        | A reusable policy. `E` declares errors the functions may return, for the callbacks.       |
+| `Tenace.call(fn, options?)`              | `Policy`        | A policy bound to `fn`. Throws a `TypeError` when `fn` is not a function.                 |
+| `Tenace.all(tasks, options?)`            | `Batch`         | Runs `tasks` through a policy. See [Batches](/guides/batches/).                           |
+| `Tenace.map(items, fn, options?)`        | `Batch`         | Runs `fn(item, context, index)` for each item through a policy.                           |
+| `Tenace.instrument(...instrumentations)` | `() => void`    | Sets the default instrumentation. Returns a function that removes this setting.           |
+| `Tenace.chaos(options)`                  | `() => void`    | Injects faults around every function call. Returns a function that removes this setting.  |
+| `Tenace.waitFor(condition, options?)`    | `Promise<void>` | Calls `condition` until it returns `true`. See [Wait for a condition](/guides/wait-for/). |
 
 The functions returned by `Tenace.instrument()` and `Tenace.chaos()` can be called in any order: the active setting is the latest one not removed yet.
 

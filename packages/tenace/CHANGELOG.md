@@ -43,6 +43,10 @@ Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime 
 - `.execute()` fails fast: it aborts the running tasks and skips the others;
 - `.settle()` returns one typed Result per task.
 
+### Waiting for a condition
+
+`waitFor(condition, options)` polls a condition until it returns `true`, with an interval (a duration or a backoff), a timeout, a signal and a clock. `condition` receives a signal aborted when the wait ends.
+
 ### Observability
 
 - **Instrumentation contract**: around-advice on executions and attempts, plus events, through `Tenace.instrument()` globally or the `instrumentation` option of a policy.
@@ -63,31 +67,31 @@ Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime 
 
 ### Breaking changes
 
-| 1.x                                                          | 2.0                                                                                                            |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `policy.call(fn)`                                            | `policy.execute(fn)` or `policy.settle(fn)`                                                                    |
-| `.withRetry(3)`, `.withRetry({ times })`                     | `.withRetry({ retries })`                                                                                      |
-| `.withExponentialBackoff(...)`                               | `.withRetry({ delay: backoff.exponential(...) })`                                                              |
-| `retryIf` / `abortIf` on `Error`                             | `retryIf` / `retryOn` on the typed errors of the chain                                                         |
-| `onRetryExhausted`                                           | the `retry.exhausted` event                                                                                    |
-| `.withTimeout(ms, { strategy })`                             | `.withTimeout(duration, { mode })`                                                                             |
-| `.withCircuitBreaker(5, 10000)`                              | `.withCircuitBreaker({ trip: { consecutive: 5 }, openFor: '10s' })`                                            |
-| `.withSamplingCircuitBreaker(...)`                           | `.withCircuitBreaker({ trip: { rate, duration } })`                                                            |
-| circuit `onOpen` / `onClose` / `onHalfOpen`                  | `onStateChange({ from, to })`                                                                                  |
-| `.withBulkhead(limit, { queue })`                            | `.withBulkhead({ concurrency, queue, maxWait })`                                                               |
-| `.withRateLimit({ key, maxCalls, windowMs, queue })`         | `.withRateLimit({ limit, per, key, maxWait })`                                                                 |
-| `.withDistributedLock(...)`                                  | `.withLock({ provider, key, timeout, ttl })`                                                                   |
-| `.withCache({ key, ttl, adapter })`                          | `.withCache({ provider, key, ttl })`                                                                           |
-| `optional: true` on cache, rate limit and lock               | the cache always fails open. A failing rate limit store or lock provider fails the call with `UnexpectedError` |
-| `configStore.configure({ cache, rateLimiter, lock })`        | pass the provider or store to each strategy, or share a strategy instance                                      |
-| `.withSpan(name, attributes)`                                | the `name` option of the policy, `execute(fn, { name, attributes })`                                           |
-| `.withChaosFault()`, `.withChaosLatency()`                   | `.withChaos({ rate, latency, throws, error, value })`                                                          |
-| `Tenace.chaos.enable()` / `.disable()`                       | `const restore = Tenace.chaos(options)`                                                                        |
-| `Tenace.hooks.onX(fn)`, `use(plugin)`                        | `Tenace.instrument(listener(event => ...))`                                                                    |
-| `Tenace.all(tasks).withConcurrency(n).withRetryPerTask(...)` | `Tenace.all(tasks, { concurrency: n, policy })`                                                                |
-| `.stopOnError(false)`                                        | `.settle()`                                                                                                    |
-| `onTaskComplete`, `onTaskError`, `onProgress`                | removed                                                                                                        |
-| `Semaphore`                                                  | removed, use a `Bulkhead`                                                                                      |
-| `Tenace.waitFor()`                                           | removed                                                                                                        |
-| `Tenace.wrap(fn, policy)`, `policy.wrap(fn)`                 | removed, use `Tenace.call(fn)` or a closure                                                                    |
-| cockatiel dependency                                         | removed                                                                                                        |
+| 1.x                                                                         | 2.0                                                                                                                                                     |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `policy.call(fn)`                                                           | `policy.execute(fn)` or `policy.settle(fn)`                                                                                                             |
+| `.withRetry(3)`, `.withRetry({ times })`                                    | `.withRetry({ retries })`                                                                                                                               |
+| `.withExponentialBackoff(...)`                                              | `.withRetry({ delay: backoff.exponential(...) })`                                                                                                       |
+| `retryIf` / `abortIf` on `Error`                                            | `retryIf` / `retryOn` on the typed errors of the chain                                                                                                  |
+| `onRetryExhausted`                                                          | the `retry.exhausted` event                                                                                                                             |
+| `.withTimeout(ms, { strategy })`                                            | `.withTimeout(duration, { mode })`                                                                                                                      |
+| `.withCircuitBreaker(5, 10000)`                                             | `.withCircuitBreaker({ trip: { consecutive: 5 }, openFor: '10s' })`                                                                                     |
+| `.withSamplingCircuitBreaker(...)`                                          | `.withCircuitBreaker({ trip: { rate, duration } })`                                                                                                     |
+| circuit `onOpen` / `onClose` / `onHalfOpen`                                 | `onStateChange({ from, to })`                                                                                                                           |
+| `.withBulkhead(limit, { queue })`                                           | `.withBulkhead({ concurrency, queue, maxWait })`                                                                                                        |
+| `.withRateLimit({ key, maxCalls, windowMs, queue })`                        | `.withRateLimit({ limit, per, key, maxWait })`                                                                                                          |
+| `.withDistributedLock(...)`                                                 | `.withLock({ provider, key, timeout, ttl })`                                                                                                            |
+| `.withCache({ key, ttl, adapter })`                                         | `.withCache({ provider, key, ttl })`                                                                                                                    |
+| `optional: true` on cache, rate limit and lock                              | the cache always fails open. A failing rate limit store or lock provider fails the call with `UnexpectedError`                                          |
+| `configStore.configure({ cache, rateLimiter, lock })`                       | pass the provider or store to each strategy, or share a strategy instance                                                                               |
+| `.withSpan(name, attributes)`                                               | the `name` option of the policy, `execute(fn, { name, attributes })`                                                                                    |
+| `.withChaosFault()`, `.withChaosLatency()`                                  | `.withChaos({ rate, latency, throws, error, value })`                                                                                                   |
+| `Tenace.chaos.enable()` / `.disable()`                                      | `const restore = Tenace.chaos(options)`                                                                                                                 |
+| `Tenace.hooks.onX(fn)`, `use(plugin)`                                       | `Tenace.instrument(listener(event => ...))`                                                                                                             |
+| `Tenace.all(tasks).withConcurrency(n).withRetryPerTask(...)`                | `Tenace.all(tasks, { concurrency: n, policy })`                                                                                                         |
+| `.stopOnError(false)`                                                       | `.settle()`                                                                                                                                             |
+| `onTaskComplete`, `onTaskError`, `onProgress`                               | removed                                                                                                                                                 |
+| `Semaphore`                                                                 | removed, use a `Bulkhead`                                                                                                                               |
+| `Tenace.waitFor(condition, { interval, timeout, message, before, signal })` | `waitFor(condition, { interval, timeout, signal, clock })`, also `Tenace.waitFor()`. It rejects with a `TimeoutError`, and `interval` accepts a backoff |
+| `Tenace.wrap(fn, policy)`, `policy.wrap(fn)`                                | removed, use `Tenace.call(fn)` or a closure                                                                                                             |
+| cockatiel dependency                                                        | removed                                                                                                                                                 |

@@ -84,6 +84,7 @@ export default defineConfig({
           label: 'Guides',
           items: [
             'guides/batches',
+            'guides/wait-for',
             'guides/keys-and-adapters',
             'guides/testing',
             'guides/custom-strategies',

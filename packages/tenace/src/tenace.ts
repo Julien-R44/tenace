@@ -10,6 +10,7 @@ import { Chaos, type ChaosOptions } from './strategies/chaos.ts'
 import { type Fn, Policy, type PolicyOptions } from './policy.ts'
 import type { Result } from './result.ts'
 import type { AnyOp } from './strategy.ts'
+import { waitFor } from './wait_for.ts'
 
 type ReusablePolicy = Policy<readonly AnyOp[], unknown, unknown, undefined>
 type DefaultPolicy = Policy<[], never, OtherError>
@@ -91,6 +92,16 @@ export interface TenaceEntry {
    * ```
    */
   chaos(options: Omit<ChaosOptions, 'error' | 'value'>): () => void
+
+  /**
+   * Calls `condition` until it returns `true`. Rejects with a `TimeoutError` after
+   * `timeout` (`10s` by default). Same as the `waitFor` export.
+   *
+   * ```ts
+   * await Tenace.waitFor(() => queue.isEmpty(), { interval: '200ms', timeout: '5s' })
+   * ```
+   */
+  waitFor: typeof waitFor
 }
 
 export const Tenace: TenaceEntry = Object.freeze({
@@ -125,4 +136,5 @@ export const Tenace: TenaceEntry = Object.freeze({
     overrideGlobalInstrumentation(
       instrumentations.length === 0 ? undefined : combine(...instrumentations),
     ),
+  waitFor,
 })
