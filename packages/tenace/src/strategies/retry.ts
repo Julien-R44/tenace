@@ -7,30 +7,33 @@ import type { TagOf } from '../types.ts'
 import { backoff } from '../backoff.ts'
 import type { RetryBudget } from './retry_budget.ts'
 
-export interface RetryEvent<E> {
+/**
+ * Why an attempt is retried with `retryIfValue`: the error it failed with, or the value
+ * `retryIfValue` rejected. Tell them apart with `'value' in cause`.
+ */
+export type RetryCause<E, V> =
+  | { readonly error: E }
+  | { readonly value: V; readonly error?: undefined }
+
+/**
+ * Passed to `onRetry`. Without `retryIfValue` (`V = never`), always about an error.
+ */
+export type RetryEvent<E, V = never> = {
   /**
-   * The 1-based attempt that just failed.
+   * The 1-based attempt that is retried.
    */
   readonly attempt: number
-  readonly error: E
   /**
    * Delay before the next attempt.
    */
   readonly delayMs: number
-}
+} & ([V] extends [never] ? { readonly error: E } : RetryCause<E, V>)
 
-export interface RetryOptions<E = unknown> {
+interface BaseRetryOptions<E> {
   /**
    * Retries after the first attempt: `retries: 2` means at most 3 attempts.
    */
   readonly retries: number
-  /**
-   * Delay before each retry: a fixed duration, a backoff preset, or a function of the
-   * failed attempt and its error. Defaults to `backoff.exponential()` (100ms base, x2,
-   * 30s max, full jitter). An `Infinity` delay (or `retryAfterMs`) stops retrying and
-   * returns the error, with a `retry.declined` event.
-   */
-  readonly delay?: Duration | ((attempt: number, error: E) => Duration)
   /**
    * Only retry errors with these tags.
    */
@@ -40,11 +43,7 @@ export interface RetryOptions<E = unknown> {
    */
   readonly retryIf?: (error: E, attempt: number) => boolean
   /**
-   * Called before waiting for the next attempt.
-   */
-  readonly onRetry?: (event: RetryEvent<E>) => void
-  /**
-   * Shared cap on the share of retries. When exhausted, the last error is returned.
+   * Shared cap on the share of retries. When exhausted, the last result is returned.
    */
   readonly budget?: RetryBudget
   /**
@@ -58,17 +57,55 @@ export interface RetryOptions<E = unknown> {
   readonly maxDelay?: Duration
   /**
    * Overrides the execution `idempotent` option. When `false`, only calls rejected before
-   * running (open circuit, full bulkhead, rate limit, lock) are retried.
+   * running (open circuit, full bulkhead, rate limit, lock) are retried, never values.
    */
   readonly idempotent?: boolean
 }
 
+export interface RetryOptions<E = unknown> extends BaseRetryOptions<E> {
+  /**
+   * Delay before each retry: a fixed duration, a backoff preset, or a function of the
+   * failed attempt and its error. Defaults to `backoff.exponential()` (100ms base, x2,
+   * 30s max, full jitter). An `Infinity` delay (or `retryAfterMs`) stops retrying and
+   * returns the error, with a `retry.declined` event.
+   */
+  readonly delay?: Duration | ((attempt: number, error: E) => Duration)
+  /**
+   * Called before waiting for the next attempt.
+   */
+  readonly onRetry?: (event: RetryEvent<E>) => void
+  readonly retryIfValue?: undefined
+}
+
+/**
+ * Retry options that also retry successful values (`retryIfValue`). `delay` and `onRetry`
+ * then see the cause of each retry: `{ error }` or `{ value }`.
+ */
+export interface ValueRetryOptions<E = unknown, V = unknown> extends BaseRetryOptions<E> {
+  /**
+   * Also retry successful values for which it returns `true`, such as a `503` response that
+   * did not throw. Once retries are exhausted, the last value is returned as a success.
+   * Values never go through `retryOn` / `retryIf`, which only see errors.
+   */
+  readonly retryIfValue: (value: V, attempt: number) => boolean
+  /**
+   * Like `RetryOptions.delay`, with the cause of the retry instead of the error.
+   */
+  readonly delay?: Duration | ((attempt: number, cause: RetryCause<E, V>) => Duration)
+  /**
+   * Called before waiting for the next attempt.
+   */
+  readonly onRetry?: (event: RetryEvent<E, V>) => void
+}
+
+type AnyRetryOptions<E, V> = ValueRetryOptions<E, V> | RetryOptions<E>
+
 /**
  * Options of a `Retry` built on its own: `retryOn` accepts any tag when the errors are unknown.
  */
-type StandaloneRetryOptions<E> = unknown extends E
-  ? Omit<RetryOptions<E>, 'retryOn'> & { readonly retryOn?: readonly string[] }
-  : RetryOptions<E>
+type Standalone<O, E> = unknown extends E
+  ? Omit<O, 'retryOn'> & { readonly retryOn?: readonly string[] }
+  : O
 
 const NOT_RUN_TAGS: ReadonlySet<unknown> = new Set([
   'CircuitOpenError',
@@ -80,27 +117,30 @@ const NOT_RUN_TAGS: ReadonlySet<unknown> = new Set([
 const defaultDelay = backoff.exponential()
 
 /**
- * Retries the inner steps when they fail. Stops on success, when retries are exhausted,
- * when the error is not retryable, or as soon as the signal aborts. Returns the last error.
+ * Retries the inner steps when they fail, or when `retryIfValue` rejects their value. Stops
+ * on an accepted result, when retries are exhausted, when the cause is not retryable, or as
+ * soon as the signal aborts. Returns the last result.
  *
  * The inner steps see the attempt number (1-based) in their context. Callbacks must not
  * throw: a throw is a bug and rejects the execution with the thrown value.
  */
-export class Retry<E = unknown> extends Strategy {
+export class Retry<E = unknown, V = unknown> extends Strategy {
   readonly name = 'retry'
   readonly retries: number
-  readonly #options: RetryOptions<E>
+  readonly #options: AnyRetryOptions<E, V>
   readonly #fixedDelay: number | undefined
   readonly #maxDelay: number
 
-  constructor(options: StandaloneRetryOptions<E>) {
+  constructor(options: Standalone<ValueRetryOptions<E, V>, E>)
+  constructor(options: Standalone<RetryOptions<E>, E>)
+  constructor(options: Standalone<AnyRetryOptions<E, V>, E>) {
     super()
     const { retries } = options
     if (!(retries === Number.POSITIVE_INFINITY || (Number.isInteger(retries) && retries >= 0))) {
       throw new RangeError(`Invalid retries: ${retries}. Expected a non-negative integer`)
     }
     this.retries = retries
-    this.#options = options as RetryOptions<E>
+    this.#options = options as AnyRetryOptions<E, V>
     this.#fixedDelay =
       typeof options.delay === 'function' || options.delay === undefined
         ? undefined
@@ -114,36 +154,53 @@ export class Retry<E = unknown> extends Strategy {
 
     for (let attempt = 1; ; attempt++) {
       const result = await next(context.with({ attempt }))
-      if (result.ok || context.signal.aborted) return result
+      if (context.signal.aborted) return result
+      const cause = this.#causeOf(result, attempt)
+      if (!cause) return result
       if (attempt > this.retries) {
-        if (this.retries > 0)
-          context.emit({ type: 'retry.exhausted', attempts: attempt, error: result.error })
+        if (this.retries > 0) context.emit({ type: 'retry.exhausted', attempts: attempt, ...cause })
         return result
       }
 
-      const error = result.error as E
-      if (!this.#isRetryable(error, attempt)) return result
       const idempotent = this.#options.idempotent ?? context.idempotent
-      if (!idempotent && !NOT_RUN_TAGS.has((error as { _tag?: unknown } | null)?._tag)) {
-        context.emit({ type: 'retry.declined', attempt, error, reason: 'idempotency' })
+      const notRun = !result.ok && NOT_RUN_TAGS.has((result.error as { _tag?: unknown })?._tag)
+      if (!idempotent && !notRun) {
+        context.emit({ type: 'retry.declined', attempt, reason: 'idempotency', ...cause })
         return result
       }
-      const delayMs = this.#delayFor(error, attempt)
+      const delayMs = this.#delayFor(cause, attempt)
       if (delayMs === Number.POSITIVE_INFINITY) {
-        context.emit({ type: 'retry.declined', attempt, error, reason: 'delay' })
+        context.emit({ type: 'retry.declined', attempt, reason: 'delay', ...cause })
         return result
       }
       if (this.#options.budget && !this.#options.budget.tryAcquire(context.clock)) {
-        context.emit({ type: 'retry.declined', attempt, error, reason: 'budget' })
+        context.emit({ type: 'retry.declined', attempt, reason: 'budget', ...cause })
         return result
       }
 
-      this.#options.onRetry?.({ attempt, error, delayMs })
-      context.emit({ type: 'retry.scheduled', attempt, delayMs, error })
+      ;(this.#options.onRetry as ((event: RetryEvent<E, V>) => void) | undefined)?.({
+        attempt,
+        delayMs,
+        ...cause,
+      } as RetryEvent<E, V>)
+      context.emit({ type: 'retry.scheduled', attempt, delayMs, ...cause })
 
       const waited = await sleep(context.clock, delayMs, context.signal)
       if (!waited) return result
     }
+  }
+
+  /**
+   * Why `result` should be retried, if it should.
+   */
+  #causeOf(result: AnyResult, attempt: number): RetryCause<E, V> | undefined {
+    if (result.ok) {
+      const { retryIfValue } = this.#options
+      const value = result.value as V
+      return retryIfValue?.(value, attempt) ? { value } : undefined
+    }
+    const error = result.error as E
+    return this.#isRetryable(error, attempt) ? { error } : undefined
   }
 
   #isRetryable(error: E, attempt: number): boolean {
@@ -154,14 +211,20 @@ export class Retry<E = unknown> extends Strategy {
     return !retryIf || retryIf(error, attempt)
   }
 
-  #delayFor(error: E, attempt: number): number {
+  #delayFor(cause: RetryCause<E, V>, attempt: number): number {
     const { delay } = this.#options
     let delayMs =
       this.#fixedDelay ??
-      (typeof delay === 'function' ? toMs(delay(attempt, error)) : defaultDelay(attempt))
+      (typeof delay === 'function'
+        ? toMs(
+            this.#options.retryIfValue
+              ? (delay as (attempt: number, cause: RetryCause<E, V>) => Duration)(attempt, cause)
+              : (delay as (attempt: number, error: E) => Duration)(attempt, cause.error as E),
+          )
+        : defaultDelay(attempt))
 
-    if (this.#options.respectRetryAfter !== false) {
-      const retryAfterMs = (error as { retryAfterMs?: unknown } | null)?.retryAfterMs
+    if (this.#options.respectRetryAfter !== false && 'error' in cause) {
+      const retryAfterMs = (cause.error as { retryAfterMs?: unknown } | null)?.retryAfterMs
       if (typeof retryAfterMs === 'number' && retryAfterMs > delayMs) delayMs = retryAfterMs
     }
     return Math.min(delayMs, this.#maxDelay)

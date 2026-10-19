@@ -76,9 +76,9 @@ With `spanEvents: true`, each Tenace event becomes an event on the execution spa
 
 | Event                                                       | Attributes                                                                                      |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `retry.scheduled`                                           | `tenace.attempt.number`, `tenace.retry.delay_ms`, `error.type`                                  |
-| `retry.exhausted`                                           | `tenace.attempts`, `error.type`                                                                 |
-| `retry.declined`                                            | `tenace.attempt.number`, `tenace.retry.declined_reason`, `error.type`                           |
+| `retry.scheduled`                                           | `tenace.attempt.number`, `tenace.retry.delay_ms`, `tenace.retry.cause`, `error.type`            |
+| `retry.exhausted`                                           | `tenace.attempts`, `tenace.retry.cause`, `error.type`                                           |
+| `retry.declined`                                            | `tenace.attempt.number`, `tenace.retry.declined_reason`, `tenace.retry.cause`, `error.type`     |
 | `timeout`                                                   | `tenace.attempt.number`, `tenace.timeout.ms`                                                    |
 | `circuit.state_changed`                                     | `tenace.circuit_breaker.name`, `tenace.circuit_breaker.from`, `tenace.circuit_breaker.to`       |
 | `circuit.rejected`                                          | `tenace.circuit_breaker.name`, `tenace.circuit_breaker.state`, `tenace.retry_after_ms` when set |
@@ -89,6 +89,8 @@ With `spanEvents: true`, each Tenace event becomes an event on the execution spa
 | `lock.rejected`, `dedupe.joined`, `cache.hit`, `cache.miss` | `tenace.key`                                                                                    |
 | `cache.stale`, `cache.failed`                               | `tenace.key`, `error.type`                                                                      |
 | `custom`                                                    | `tenace.event.custom_name`, and the attributes of the event                                     |
+
+`tenace.retry.cause` is `error`, or `value` for a retry caused by `retryIfValue`, which has no `error.type`.
 
 ## Metrics
 

@@ -31,6 +31,7 @@ export {
   type Instrumentation,
   listener,
   noopInstrumentation,
+  type RetryEventCause,
   type TenaceEvent,
 } from './instrumentation.ts'
 export type {
@@ -114,7 +115,13 @@ export {
   MemoryCircuitBreakerStore,
 } from './strategies/circuit_breaker/store.ts'
 export { Fallback, type FallbackHandler, MapError } from './strategies/fallback.ts'
-export { Retry, type RetryEvent, type RetryOptions } from './strategies/retry.ts'
+export {
+  Retry,
+  type RetryCause,
+  type RetryEvent,
+  type RetryOptions,
+  type ValueRetryOptions,
+} from './strategies/retry.ts'
 export { RetryBudget, type RetryBudgetOptions } from './strategies/retry_budget.ts'
 export { Timeout, type TimeoutOptions } from './strategies/timeout.ts'
 export { type AnyOp, type AnyStrategy, type Next, type Op, Strategy } from './strategy.ts'

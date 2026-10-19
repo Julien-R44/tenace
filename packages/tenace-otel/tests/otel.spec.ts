@@ -101,6 +101,23 @@ test.group('openTelemetry', group => {
     )
   })
 
+  test('a retry caused by a value has no error.type', async ({ assert }) => {
+    const { instrumentation, byName } = setup()
+    let calls = 0
+    await Tenace.call(() => ({ status: ++calls === 1 ? 503 : 200 }), {
+      name: 'poll',
+      instrumentation,
+    })
+      .withRetry({ retries: 1, delay: 0, retryIfValue: res => res.status === 503 })
+      .execute()
+    const [root] = byName('poll')
+    const [scheduled] = root!.events
+    assert.equal(scheduled!.name, 'tenace.retry.scheduled')
+    assert.equal(scheduled!.attributes?.['tenace.retry.cause'], 'value')
+    assert.notProperty(scheduled!.attributes ?? {}, 'error.type')
+    assert.equal(root!.status.code, SpanStatusCode.UNSET)
+  })
+
   test('the execution span records the final failure', async ({ assert }) => {
     const { instrumentation, byName } = setup()
     await Tenace.policy({ name: 'charge', instrumentation }).settle(() => err(new HttpError('402')))

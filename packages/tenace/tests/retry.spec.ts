@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { backoff } from '../src/backoff.ts'
 import { TenaceError, TimeoutError, UnexpectedError } from '../src/errors.ts'
-import { listener } from '../src/instrumentation.ts'
+import { listener, type TenaceEvent } from '../src/instrumentation.ts'
 import { sleep } from '../src/internal/sleep.ts'
 import { err, ok } from '../src/result.ts'
 import { Retry } from '../src/strategies/retry.ts'
@@ -277,6 +277,97 @@ test.group('Retry | classification', () => {
     assert.isAtMost(b - a, 100)
     assert.isAtMost(c - b, 200)
     assert.isAtMost(d - c, 400)
+  })
+})
+
+test.group('Retry | values', () => {
+  /**
+   * A function returning these statuses in turn, like fetch returning responses that did not throw.
+   */
+  function responses(...statuses: number[]) {
+    let calls = 0
+    const fn = () => ({ status: statuses[Math.min(calls++, statuses.length - 1)]! })
+    return { fn, calls: () => calls }
+  }
+
+  test('retries values retryIfValue rejects, until one passes', async ({ assert }) => {
+    const { fn, calls } = responses(503, 503, 200)
+    const response = await Tenace.call(fn)
+      .withRetry({ retries: 3, delay: 0, retryIfValue: res => res.status === 503 })
+      .execute()
+    assert.deepEqual(response, { status: 200 })
+    assert.equal(calls(), 3)
+  })
+
+  test('returns the last value as a success once retries are exhausted', async ({ assert }) => {
+    const events: TenaceEvent[] = []
+    const { fn, calls } = responses(503)
+    const result = await Tenace.call(fn, { instrumentation: listener(e => events.push(e)) })
+      .withRetry({ retries: 2, delay: 0, retryIfValue: res => res.status === 503 })
+      .settle()
+    assert.deepEqual(result, ok({ status: 503 }))
+    assert.equal(calls(), 3)
+    assert.deepEqual(events.at(-1), {
+      type: 'retry.exhausted',
+      attempts: 3,
+      value: { status: 503 },
+    })
+  })
+
+  test('errors and values share one retry count, errors keep retryOn', async ({ assert }) => {
+    const causes: string[] = []
+    let calls = 0
+    const fn = () => {
+      calls++
+      if (calls === 1) return err(new NotFound('x'))
+      if (calls === 2) return { status: 503 }
+      return { status: 200 }
+    }
+    const result = await Tenace.call(fn)
+      .withRetry({
+        retries: 1,
+        delay: 0,
+        retryOn: ['NotFound'],
+        retryIfValue: res => res.status === 503,
+        onRetry: event => causes.push('value' in event ? 'value' : 'error'),
+      })
+      .settle()
+    // one retry only: the 503 of the second call is returned
+    assert.deepEqual(result, ok({ status: 503 }))
+    assert.deepEqual(causes, ['error'])
+  })
+
+  test('delay sees the cause, so a response can set the delay', async ({ assert }) => {
+    const clock = new TestClock()
+    const times: number[] = []
+    let calls = 0
+    const fn = () => {
+      times.push(clock.now())
+      return ++calls === 1 ? { status: 429, retryAfter: 2000 } : { status: 200, retryAfter: 0 }
+    }
+    const done = Tenace.call(fn)
+      .withRetry({
+        retries: 1,
+        retryIfValue: res => res.status === 429,
+        delay: (_attempt, cause) => ('value' in cause ? cause.value.retryAfter : 10),
+      })
+      .execute({ clock })
+    await clock.advance('2s')
+    assert.deepEqual(await done, { status: 200, retryAfter: 0 })
+    assert.deepEqual(times, [0, 2000])
+  })
+
+  test('never retries a value when the call is not idempotent', async ({ assert }) => {
+    const events: TenaceEvent[] = []
+    const { fn, calls } = responses(503, 200)
+    const result = await Tenace.call(fn, { instrumentation: listener(e => events.push(e)) })
+      .withRetry({ retries: 2, delay: 0, retryIfValue: res => res.status === 503 })
+      .settle({ idempotent: false })
+    assert.deepEqual(result, ok({ status: 503 }))
+    assert.equal(calls(), 1)
+    assert.deepEqual(events, [
+      { type: 'retry.declined', attempt: 1, reason: 'idempotency', value: { status: 503 } },
+    ])
   })
 })
 

@@ -16,6 +16,7 @@ import {
   type CircuitState,
   type Instrumentation,
   isTenaceError,
+  type RetryEventCause,
   type TenaceEvent,
   UnexpectedError,
 } from '@julr/tenace'
@@ -72,21 +73,30 @@ function recordError(span: Span, error: unknown): void {
   })
 }
 
+/**
+ * A retry caused by a value (`retryIfValue`) has no `error.type`.
+ */
+function retryCause(event: RetryEventCause): Attributes {
+  return 'value' in event
+    ? { 'tenace.retry.cause': 'value' }
+    : { 'tenace.retry.cause': 'error', 'error.type': errorType(event.error) }
+}
+
 function eventAttributes(event: TenaceEvent): Attributes {
   switch (event.type) {
     case 'retry.scheduled':
       return {
         'tenace.attempt.number': event.attempt,
         'tenace.retry.delay_ms': event.delayMs,
-        'error.type': errorType(event.error),
+        ...retryCause(event),
       }
     case 'retry.exhausted':
-      return { 'tenace.attempts': event.attempts, 'error.type': errorType(event.error) }
+      return { 'tenace.attempts': event.attempts, ...retryCause(event) }
     case 'retry.declined':
       return {
         'tenace.attempt.number': event.attempt,
         'tenace.retry.declined_reason': event.reason,
-        'error.type': errorType(event.error),
+        ...retryCause(event),
       }
     case 'timeout':
       return { 'tenace.attempt.number': event.attempt, 'tenace.timeout.ms': event.timeoutMs }

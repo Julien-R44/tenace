@@ -8,20 +8,26 @@ export type Attributes = Readonly<Record<string, string | number | boolean>>
 /**
  * Everything strategies report. `attempt` is 1-based.
  */
+/**
+ * What a retry event is about: the error of the attempt, or the value `retryIfValue`
+ * rejected (`'value' in event`).
+ */
+export type RetryEventCause =
+  | { readonly error: unknown }
+  | { readonly value: unknown; readonly error?: undefined }
+
 export type TenaceEvent =
-  | {
+  | ({
       readonly type: 'retry.scheduled'
       readonly attempt: number
       readonly delayMs: number
-      readonly error: unknown
-    }
-  | { readonly type: 'retry.exhausted'; readonly attempts: number; readonly error: unknown }
-  | {
+    } & RetryEventCause)
+  | ({ readonly type: 'retry.exhausted'; readonly attempts: number } & RetryEventCause)
+  | ({
       readonly type: 'retry.declined'
       readonly attempt: number
-      readonly error: unknown
       readonly reason: 'budget' | 'idempotency' | 'delay'
-    }
+    } & RetryEventCause)
   | { readonly type: 'timeout'; readonly attempt: number; readonly timeoutMs: number }
   | {
       readonly type: 'circuit.state_changed'

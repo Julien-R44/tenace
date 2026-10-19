@@ -162,6 +162,7 @@ Aggressive by default: at the deadline it returns `TimeoutError` and aborts the 
   delay: backoff.exponential({ base: '100ms', max: '10s' }), // default, with full jitter
   retryOn: ['TimeoutError'], // only these tags
   retryIf: (error, attempt) => true,
+  retryIfValue: (value, attempt) => false, // also retry values, e.g. a 503 response that did not throw
   maxDelay: '30s', // caps every delay, Retry-After included
   onRetry: ({ attempt, error, delayMs }) => {},
   budget: new RetryBudget({ ratio: 0.2 }), // shared cap against retry storms
@@ -169,6 +170,7 @@ Aggressive by default: at the deadline it returns `TimeoutError` and aborts the 
 ```
 
 - **`delay`** accepts a duration, `backoff.constant` / `linear` / `exponential`, or `(attempt, error) => duration`.
+- **Values:** `retryIfValue` retries successful values too, sharing the same count and delays. Once exhausted, the last value is returned as a success. `delay` and `onRetry` then receive `{ error }` or `{ value }`.
 - **Retry-After:** errors with a `retryAfterMs` (rate limits, open circuits) are waited out at least that long, up to `maxDelay`.
 - **Aborts:** retries stop as soon as the signal aborts.
 - **Non-idempotent calls:** pass `execute(fn, { idempotent: false })` for calls that must not run twice. Only calls that were rejected before running (open circuit, full bulkhead, rate limit, lock) are then retried.

@@ -70,3 +70,45 @@ Tenace.policy<HttpError>().withRetry({
   retries: 1,
   retryIf: error => error._tag === 'HttpError' && error.status >= 500,
 })
+
+/* ---- retryIfValue ---- */
+type Res = { status: number; headers: Headers }
+declare const fetchLike: () => Promise<Res>
+
+// a bound call sees its value, onRetry and delay see the cause
+const byValue = Tenace.call(fetchLike).withRetry({
+  retries: 3,
+  retryIfValue: (value, attempt) => {
+    expectType<Equal<typeof value, Res>>()
+    expectType<Equal<typeof attempt, number>>()
+    return value.status === 503
+  },
+  delay: (_attempt, cause) => ('value' in cause ? 1000 : 100),
+  onRetry: event => {
+    if ('value' in event) expectType<Equal<typeof event.value, Res>>()
+    else expectType<Equal<typeof event.error, UnexpectedError>>()
+  },
+})
+// the error channel and the value are unchanged
+expectType<Equal<ErrorOf<typeof byValue>, UnexpectedError>>()
+const v1 = await byValue.execute()
+expectType<Equal<typeof v1, Res>>()
+
+// a reusable policy does not know its value yet
+Tenace.policy().withRetry({
+  retries: 1,
+  retryIfValue: value => {
+    expectType<Equal<typeof value, unknown>>()
+    return value instanceof Response && value.status >= 500
+  },
+})
+
+// without retryIfValue, onRetry and delay still see the error only
+Tenace.call(fetchLike).withRetry({
+  retries: 1,
+  delay: (_attempt, error) => (expectType<Equal<typeof error, UnexpectedError>>(), 0),
+  onRetry: event => expectType<Equal<typeof event.error, UnexpectedError>>(),
+})
+
+// a standalone Retry with retryIfValue
+void new Retry({ retries: 1, retryIfValue: (value: Res) => value.status === 503 })

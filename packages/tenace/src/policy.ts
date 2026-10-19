@@ -45,7 +45,7 @@ import {
   type CircuitBreakerOptions,
 } from './strategies/circuit_breaker/circuit_breaker.ts'
 import { byTags, Fallback, MapError } from './strategies/fallback.ts'
-import { Retry, type RetryOptions } from './strategies/retry.ts'
+import { Retry, type RetryOptions, type ValueRetryOptions } from './strategies/retry.ts'
 import { Timeout, type TimeoutOptions } from './strategies/timeout.ts'
 
 /**
@@ -152,6 +152,12 @@ type ValuesOf<X> =
       : never
 
 type BoundValue<Bound> = Bound extends Fn ? ValueOfReturn<Returned<Bound>> : never
+
+/**
+ * Values the steps added so far can succeed with: known for a bound call, `unknown` for a
+ * reusable policy (its function is not known yet).
+ */
+type ChainValue<Bound, TAdd> = Bound extends Fn ? BoundValue<Bound> | TAdd : unknown
 type BoundError<Bound> = Bound extends Fn ? ErrorOfReturn<Returned<Bound>> : never
 
 /**
@@ -264,9 +270,13 @@ export class Policy<
    * ```
    */
   withRetry(
-    options: RetryOptions<Fold<EIn | UnexpectedError, Ops>>,
+    options: ValueRetryOptions<Fold<EIn | UnexpectedError, Ops>, ChainValue<Bound, TAdd>>,
+  ): Policy<Ops, TAdd, EIn, Bound>
+  withRetry(options: RetryOptions<Fold<EIn | UnexpectedError, Ops>>): Policy<Ops, TAdd, EIn, Bound>
+  withRetry(
+    options: RetryOptions<never> | ValueRetryOptions<never, never>,
   ): Policy<Ops, TAdd, EIn, Bound> {
-    return this.#append(new Retry(options))
+    return this.#append(new Retry(options as RetryOptions))
   }
 
   /**

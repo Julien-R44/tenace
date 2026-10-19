@@ -24,17 +24,18 @@ policy.withRetry(options: RetryOptions)
 new Retry(options: RetryOptions)
 ```
 
-| Option              | Type                                       | Default                 | Description                                                               |
-| ------------------- | ------------------------------------------ | ----------------------- | ------------------------------------------------------------------------- |
-| `retries`           | `number`                                   | required                | Retries after the first attempt. `retries: 2` means at most 3 attempts.   |
-| `delay`             | `Duration \| (attempt, error) => Duration` | `backoff.exponential()` | Delay before each retry. See [Delays](#delays).                           |
-| `retryOn`           | `readonly string[]`                        | every error             | Retry only the errors with these `_tag` values.                           |
-| `retryIf`           | `(error, attempt) => boolean`              | every error             | Retry only the errors for which it returns `true`.                        |
-| `onRetry`           | `({ attempt, error, delayMs }) => void`    |                         | Called before each wait.                                                  |
-| `budget`            | `RetryBudget`                              |                         | Shared cap on retries. See [Retry budget](#retry-budget).                 |
-| `respectRetryAfter` | `boolean`                                  | `true`                  | Wait at least `error.retryAfterMs` when the error has one.                |
-| `maxDelay`          | `Duration`                                 | no limit                | Longest delay before a retry, `retryAfterMs` included.                    |
-| `idempotent`        | `boolean`                                  | the execution option    | Overrides `execute(fn, { idempotent })`. See [Idempotency](#idempotency). |
+| Option              | Type                                       | Default                 | Description                                                                                            |
+| ------------------- | ------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `retries`           | `number`                                   | required                | Retries after the first attempt. `retries: 2` means at most 3 attempts.                                |
+| `delay`             | `Duration \| (attempt, error) => Duration` | `backoff.exponential()` | Delay before each retry. See [Delays](#delays).                                                        |
+| `retryOn`           | `readonly string[]`                        | every error             | Retry only the errors with these `_tag` values.                                                        |
+| `retryIf`           | `(error, attempt) => boolean`              | every error             | Retry only the errors for which it returns `true`.                                                     |
+| `retryIfValue`      | `(value, attempt) => boolean`              | no value                | Also retry the successful values for which it returns `true`. See [Retrying values](#retrying-values). |
+| `onRetry`           | `({ attempt, error, delayMs }) => void`    |                         | Called before each wait.                                                                               |
+| `budget`            | `RetryBudget`                              |                         | Shared cap on retries. See [Retry budget](#retry-budget).                                              |
+| `respectRetryAfter` | `boolean`                                  | `true`                  | Wait at least `error.retryAfterMs` when the error has one.                                             |
+| `maxDelay`          | `Duration`                                 | no limit                | Longest delay before a retry, `retryAfterMs` included.                                                 |
+| `idempotent`        | `boolean`                                  | the execution option    | Overrides `execute(fn, { idempotent })`. See [Idempotency](#idempotency).                              |
 
 `retries` is a non-negative integer or `Infinity`. Any other value throws a `RangeError` when the policy is built.
 
@@ -48,7 +49,7 @@ The steps inside the retry receive the attempt number in their context, and so d
 
 The retry returns the last result as soon as one of these happens:
 
-- An attempt succeeds.
+- An attempt succeeds, with a value that does not pass `retryIfValue`.
 - The retries are exhausted.
 - The error does not pass `retryOn` or `retryIf`.
 - The signal aborts, during an attempt or during a delay.
@@ -128,10 +129,52 @@ The retry then retries only the calls that were rejected before running: `Circui
 
 The `idempotent` option of the retry overrides the option of the execution.
 
+## Retrying values
+
+Some calls report a failure without throwing: `fetch` resolves with a `503` response. `retryIfValue` retries these values like errors:
+
+```ts
+import { Tenace } from '@julr/tenace'
+
+declare const url: string
+
+const response = await Tenace.call(({ signal }) => fetch(url, { signal }))
+  .withRetry({
+    retries: 3,
+    retryIfValue: response => response.status === 503 || response.status === 429,
+  })
+  .execute()
+```
+
+- Errors and values share the `retries` count, the delays, `maxDelay`, and the budget. `retryOn` and `retryIf` still apply to errors only.
+- Once the retries are exhausted, the last value is returned as a success. The error channel does not change. To fail with a typed error instead, return `err(...)` from the function and retry it with `retryOn`.
+- `delay` and `onRetry` receive the cause of the retry, `{ error }` or `{ value }`. Tell them apart with `'value' in cause`. A response can set the delay, for example from its `Retry-After` header:
+
+  ```ts
+  import { Tenace } from '@julr/tenace'
+
+  declare const url: string
+
+  await Tenace.call(({ signal }) => fetch(url, { signal }))
+    .withRetry({
+      retries: 3,
+      retryIfValue: response => response.status === 429,
+      delay: (_attempt, cause) =>
+        'value' in cause ? Number(cause.value.headers.get('retry-after') ?? 1) * 1000 : 100,
+    })
+    .execute()
+  ```
+
+- A retried value is dropped. For a `fetch` response, release its connection in `onRetry`: `if ('value' in event) void event.value.body?.cancel()`.
+- A value is never retried when the execution is not [idempotent](#idempotency): the call already ran.
+- On a bound call (`Tenace.call(fn)`), `value` has the type of the value of `fn`. On a reusable policy, the function is not known yet, so `value` is `unknown`: narrow it, for example with `instanceof Response`.
+
 ## Events
 
-| Event             | Fields                        | When                                                                          |
-| ----------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `retry.scheduled` | `attempt`, `delayMs`, `error` | A retry is scheduled, before the wait.                                        |
-| `retry.exhausted` | `attempts`, `error`           | The last allowed attempt failed. Not emitted for `retries: 0`.                |
-| `retry.declined`  | `attempt`, `error`, `reason`  | The budget, the idempotency rule, or an `Infinity` delay stopped the retries. |
+| Event             | Fields                                   | When                                                                                                        |
+| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `retry.scheduled` | `attempt`, `delayMs`, `error` or `value` | A retry is scheduled, before the wait.                                                                      |
+| `retry.exhausted` | `attempts`, `error` or `value`           | The last allowed attempt failed, or returned a value `retryIfValue` rejected. Not emitted for `retries: 0`. |
+| `retry.declined`  | `attempt`, `error` or `value`, `reason`  | The budget, the idempotency rule, or an `Infinity` delay stopped the retries.                               |
+
+A retry event has `value` instead of `error` when `retryIfValue` caused it: check `'value' in event`.
