@@ -21,7 +21,8 @@ export abstract class TenaceError extends Error {
     // once per class: defining properties on every instance is slow
     const prototype = new.target.prototype
     if (!Object.hasOwn(prototype, 'name')) {
-      Object.defineProperty(prototype, 'name', {
+      // a frozen prototype (SES, harden()) cannot take it: keep it on the instance
+      Object.defineProperty(Object.isExtensible(prototype) ? prototype : this, 'name', {
         value: new.target.name,
         writable: true,
         configurable: true,

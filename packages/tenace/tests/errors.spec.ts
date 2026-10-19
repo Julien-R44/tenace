@@ -57,6 +57,19 @@ test.group('TenaceError', () => {
     assert.isFalse(new HttpError(500) instanceof copy.UnexpectedError)
   })
 
+  test('works with a frozen prototype (SES, harden())', ({ assert }) => {
+    class FrozenError extends TenaceError {
+      readonly _tag = 'FrozenError' as const
+      readonly code = 'E_FROZEN' as const
+    }
+    Object.freeze(FrozenError.prototype)
+
+    const error = new FrozenError('frozen')
+    assert.equal(error.name, 'FrozenError')
+    assert.isTrue(error.stack?.startsWith('FrozenError: frozen'))
+    assert.isTrue(isTenaceError(error))
+  })
+
   test('toJSON has tag, code, own fields and cause but no stack', ({ assert }) => {
     const json = JSON.parse(JSON.stringify(new HttpError(503)))
     assert.deepEqual(json, {
