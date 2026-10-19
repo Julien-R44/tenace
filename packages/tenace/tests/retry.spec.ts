@@ -1,7 +1,13 @@
 import { test } from '@japa/runner'
 
 import { backoff } from '../src/backoff.ts'
-import { TenaceError, TimeoutError, UnexpectedError } from '../src/errors.ts'
+import {
+  BulkheadFullError,
+  CircuitOpenError,
+  TenaceError,
+  TimeoutError,
+  UnexpectedError,
+} from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
 import { sleep } from '../src/internal/sleep.ts'
 import { err, ok } from '../src/result.ts'
@@ -152,6 +158,27 @@ test.group('Retry | classification', () => {
       .withRetry({ retries: 5, delay: 0, retryOn: ['NotFound'], retryIf: () => false })
       .settle(() => (++calls, err(new NotFound('x'))))
     assert.equal(calls, 1)
+  })
+
+  test('retries a CircuitOpenError only when retryOn lists it', async ({ assert }) => {
+    let calls = 0
+    const open = () => (++calls, err(new CircuitOpenError('open', 0)))
+    await Tenace.policy<CircuitOpenError>()
+      .withRetry({ retries: 2, delay: 0, retryIf: () => true })
+      .settle(open)
+    assert.equal(calls, 1)
+
+    calls = 0
+    await Tenace.policy<CircuitOpenError>()
+      .withRetry({ retries: 2, delay: 0, retryOn: ['CircuitOpenError'] })
+      .settle(open)
+    assert.equal(calls, 3)
+
+    calls = 0
+    await Tenace.policy<BulkheadFullError>()
+      .withRetry({ retries: 2, delay: 0 })
+      .settle(() => (++calls, err(new BulkheadFullError(1, 0))))
+    assert.equal(calls, 3)
   })
 
   test('a throwing retryIf is a bug: the execution rejects with the thrown value', async ({

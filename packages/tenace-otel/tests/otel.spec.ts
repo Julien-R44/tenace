@@ -156,8 +156,10 @@ test.group('openTelemetry', group => {
     const breaker = new CircuitBreaker({ name: 'users-api', trip: { consecutive: 1 } })
     const policy = Tenace.policy({ name: 'metrics', instrumentation })
       .with(breaker)
-      .withRetry({ retries: 1, delay: 0 })
-    await policy.settle(() => err('down'))
+      .withRetry({ retries: 1, delay: 0, retryOn: ['UnexpectedError', 'CircuitOpenError'] })
+    await policy.settle(() => {
+      throw new Error('down')
+    })
 
     const executions = await metric('tenace.execution.duration')
     assert.equal(executions?.dataPoints.length, 1)
@@ -173,7 +175,7 @@ test.group('openTelemetry', group => {
     const attemptDurations = await metric('tenace.attempt.duration')
     assert.deepEqual(attemptDurations?.dataPoints[0]?.attributes, {
       'tenace.operation.name': 'metrics',
-      'error.type': '_OTHER',
+      'error.type': 'Error',
     })
 
     const events = await metric('tenace.events')

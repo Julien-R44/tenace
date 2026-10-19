@@ -159,21 +159,29 @@ test.group('Idempotency', () => {
   test('calls rejected before running are still retried', async ({ assert }) => {
     const clock = new TestClock()
     const breaker = new CircuitBreaker({ trip: { consecutive: 1 }, openFor: 100, clock })
-    const policy = Tenace.policy().with(breaker).withRetry({ retries: 1, delay: 0 })
-    await policy.settle(() => err('down'), { clock })
+    const policy = Tenace.policy<Injected>()
+      .with(breaker)
+      .withRetry({ retries: 1, delay: 0, retryOn: ['CircuitOpenError', 'Injected'] })
+    await policy.settle(() => err(new Injected('down')), { clock })
 
     let calls = 0
     const settled = policy.settle(() => ++calls, { clock, idempotent: false })
     await clock.advance(100)
     assert.deepEqual(await settled, ok(1))
 
-    const strict = Tenace.policy()
+    const strict = Tenace.policy<Injected>()
       .with(breaker)
-      .withRetry({ retries: 1, delay: 0, idempotent: false })
+      .withRetry({
+        retries: 1,
+        delay: 0,
+        retryOn: ['CircuitOpenError', 'Injected'],
+        idempotent: false,
+      })
     // the failure itself is not retried, the rejection by the open circuit is
     let strictCalls = 0
-    const failed = await strict.settle(() => (strictCalls++, err('down')), { clock })
-    assert.deepEqual(failed, err('down'))
+    const down = new Injected('down')
+    const failed = await strict.settle(() => (strictCalls++, err(down)), { clock })
+    assert.deepEqual(failed, err(down))
     assert.equal(strictCalls, 1)
     const retried = strict.settle(() => 'x', { clock })
     await clock.advance(100)

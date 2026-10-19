@@ -35,7 +35,7 @@ interface BaseRetryOptions<E> {
    */
   readonly retries: number
   /**
-   * Only retry errors with these tags.
+   * Only retry errors with these tags. A `CircuitOpenError` is retried only when listed.
    */
   readonly retryOn?: readonly TagOf<E>[]
   /**
@@ -57,7 +57,8 @@ interface BaseRetryOptions<E> {
   readonly maxDelay?: Duration
   /**
    * Overrides the execution `idempotent` option. When `false`, only calls rejected before
-   * running (open circuit, full bulkhead, rate limit, lock) are retried, never values.
+   * running (full bulkhead, rate limit, lock, open circuit listed in `retryOn`) are retried,
+   * never values.
    */
   readonly idempotent?: boolean
 }
@@ -126,7 +127,8 @@ const IMMEDIATE_RETRIES_PER_YIELD = 100
 /**
  * Retries the inner steps when they fail, or when `retryIfValue` rejects their value. Stops
  * on an accepted result, when retries are exhausted, when the cause is not retryable, or as
- * soon as the signal aborts. Returns the last result.
+ * soon as the signal aborts. Returns the last result. A `CircuitOpenError` is not retryable
+ * unless `retryOn` lists it: retrying an open circuit only waits for it.
  *
  * The inner steps see the attempt number (1-based) in their context. Callbacks must not
  * throw: a throw is a bug and rejects the execution with the thrown value.
@@ -219,9 +221,8 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
 
   #isRetryable(error: E, attempt: number): boolean {
     const { retryOn, retryIf } = this.#options
-    if (retryOn && !retryOn.includes((error as { _tag?: unknown } | null)?._tag as TagOf<E>)) {
-      return false
-    }
+    const tag = (error as { _tag?: unknown } | null)?._tag as TagOf<E>
+    if (retryOn ? !retryOn.includes(tag) : tag === 'CircuitOpenError') return false
     return !retryIf || retryIf(error, attempt)
   }
 

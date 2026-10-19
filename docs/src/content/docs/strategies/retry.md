@@ -28,7 +28,7 @@ new Retry(options: RetryOptions)
 | ------------------- | ------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------ |
 | `retries`           | `number`                                   | required                | Retries after the first attempt. `retries: 2` means at most 3 attempts.                                |
 | `delay`             | `Duration \| (attempt, error) => Duration` | `backoff.exponential()` | Delay before each retry. See [Delays](#delays).                                                        |
-| `retryOn`           | `readonly string[]`                        | every error             | Retry only the errors with these `_tag` values.                                                        |
+| `retryOn`           | `readonly string[]`                        | every error             | Retry only the errors with these `_tag` values. `CircuitOpenError` is retried only when listed.        |
 | `retryIf`           | `(error, attempt) => boolean`              | every error             | Retry only the errors for which it returns `true`.                                                     |
 | `retryIfValue`      | `(value, attempt) => boolean`              | no value                | Also retry the successful values for which it returns `true`. See [Retrying values](#retrying-values). |
 | `onRetry`           | `({ attempt, error, delayMs }) => void`    |                         | Called before each wait.                                                                               |
@@ -52,6 +52,7 @@ The retry returns the last result as soon as one of these happens:
 - An attempt succeeds, with a value that does not pass `retryIfValue`.
 - The retries are exhausted.
 - The error does not pass `retryOn` or `retryIf`.
+- The error is a `CircuitOpenError` and `retryOn` does not list it. Retrying an open circuit only waits for it to admit calls, up to `openFor`.
 - The signal aborts, during an attempt or during a delay.
 - The delay is `Infinity`. See [Delays](#delays).
 - The [budget](#retry-budget) is exhausted.
@@ -87,7 +88,7 @@ The cap applies before the jitter. `factor` must be a finite number of 1 or more
 
 ### Retry-After
 
-Some errors say when to try again in a `retryAfterMs` field: `RateLimitError`, `CircuitOpenError`, or an error of your own built from an HTTP `Retry-After` header. The retry waits at least `retryAfterMs` before the next attempt, up to `maxDelay`. Set `respectRetryAfter: false` to use the delay alone.
+Some errors say when to try again in a `retryAfterMs` field: `RateLimitError`, `CircuitOpenError` when `retryOn` lists it, or an error of your own built from an HTTP `Retry-After` header. The retry waits at least `retryAfterMs` before the next attempt, up to `maxDelay`. Set `respectRetryAfter: false` to use the delay alone.
 
 ## Retry budget
 
@@ -120,12 +121,12 @@ import { Tenace } from '@julr/tenace'
 
 declare function chargeCard(orderId: string): Promise<void>
 
-const policy = Tenace.policy().withCircuitBreaker().withRetry({ retries: 3 })
+const policy = Tenace.policy().withBulkhead({ concurrency: 10 }).withRetry({ retries: 3 })
 
 await policy.execute(() => chargeCard('order-1'), { idempotent: false })
 ```
 
-The retry then retries only the calls that were rejected before running: `CircuitOpenError`, `BulkheadFullError`, `RateLimitError`, and `LockNotAcquiredError`. For any other error that passes `retryOn` and `retryIf`, it returns the error and emits `retry.declined` with the reason `idempotency`.
+The retry then retries only the calls that were rejected before running: `BulkheadFullError`, `RateLimitError`, `LockNotAcquiredError`, and `CircuitOpenError` when `retryOn` lists it. For any other error that passes `retryOn` and `retryIf`, it returns the error and emits `retry.declined` with the reason `idempotency`.
 
 The `idempotent` option of the retry overrides the option of the execution.
 

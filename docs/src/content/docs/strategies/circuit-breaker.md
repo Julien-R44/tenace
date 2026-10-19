@@ -132,7 +132,7 @@ Isolations stack. The circuit leaves the `isolated` state when every isolation i
 Adds `CircuitOpenError`, with these fields:
 
 - `state`: `'open'`, `'half-open'`, or `'isolated'`.
-- `retryAfterMs`: when a new call may be admitted, `undefined` while isolated. A [retry](/strategies/retry/#retry-after) waits at least this long.
+- `retryAfterMs`: when a new call may be admitted, `undefined` while isolated. A [retry](/strategies/retry/#when-the-retry-stops) does not retry a `CircuitOpenError` unless its `retryOn` lists it, and then waits at least this long.
 
 ## Stores
 

@@ -411,9 +411,13 @@ test.group('CircuitBreaker | isolate and events', () => {
     assert.deepEqual(events, ['closed->half-open', 'half-open->closed'])
   })
 
-  test('an outer retry waits for the circuit to admit calls again', async ({ assert }) => {
+  test('an outer retry listing CircuitOpenError waits for the circuit to admit calls again', async ({
+    assert,
+  }) => {
     const { clock, breaker } = setup()
-    const policy = Tenace.policy().with(breaker).withRetry({ retries: 3, delay: 10 })
+    const policy = Tenace.policy()
+      .with(breaker)
+      .withRetry({ retries: 3, delay: 10, retryOn: ['UnexpectedError', 'CircuitOpenError'] })
     let calls = 0
     const settled = policy.settle(() => (++calls <= 2 ? fail() : 'recovered'), { clock })
 
