@@ -9,33 +9,33 @@ export interface ChaosOptions<E = never, V = never> {
   /**
    * Share of calls affected, in `[0, 1]`. Defaults to `1`.
    */
-  readonly rate?: number
+  readonly rate?: number | undefined
   /**
    * Delay added before the call.
    */
-  readonly latency?: Duration | (() => Duration)
+  readonly latency?: Duration | (() => Duration) | undefined
   /**
    * Simulates a throw of the function (becomes an `UnexpectedError`), whether it returns or
    * throws the value. Defaults to a `ChaosError` when neither `error` nor `value` is set and
    * no latency is configured.
    */
-  readonly throws?: () => unknown
+  readonly throws?: (() => unknown) | undefined
   /**
    * Returns this error instead of calling the function (added to the error channel).
    */
-  readonly error?: () => E
+  readonly error?: (() => E) | undefined
   /**
    * Returns this value instead of calling the function.
    */
-  readonly value?: () => V
+  readonly value?: (() => V) | undefined
   /**
    * Turns the chaos on and off without rebuilding the policy. Defaults to `true`.
    */
-  readonly enabled?: boolean | (() => boolean)
+  readonly enabled?: boolean | (() => boolean) | undefined
   /**
    * Source of randomness in `[0, 1)`, for tests. Defaults to `Math.random`.
    */
-  readonly random?: () => number
+  readonly random?: (() => number) | undefined
 }
 
 /**

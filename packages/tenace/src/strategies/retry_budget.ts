@@ -5,19 +5,19 @@ export interface RetryBudgetOptions {
   /**
    * Retries allowed per execution, on average over the window. Defaults to `0.2` (20%).
    */
-  readonly ratio?: number
+  readonly ratio?: number | undefined
   /**
    * Retries always allowed per second, even with little traffic. Defaults to `10`.
    */
-  readonly minPerSecond?: number
+  readonly minPerSecond?: number | undefined
   /**
    * Window over which executions and retries are counted. Defaults to `10s`.
    */
-  readonly window?: Duration
+  readonly window?: Duration | undefined
   /**
    * Defaults to the clock of each execution (`execute(fn, { clock })`, else the system clock).
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
 }
 
 const BUCKETS = 10

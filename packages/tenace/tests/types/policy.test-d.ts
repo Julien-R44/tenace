@@ -1,10 +1,10 @@
 import type { Context } from '../../src/context.ts'
 import { TenaceError, type TimeoutError, type UnexpectedError } from '../../src/errors.ts'
-import type { OtherError } from '../../src/fold.ts'
-import type { AnyPolicy, CurrentError, ErrorOf, Policy } from '../../src/policy.ts'
+import type { OtherError, ValueOfReturn } from '../../src/fold.ts'
+import type { AnyPolicy, CurrentError, ErrorOf, Policy, ReusablePolicy } from '../../src/policy.ts'
 import { err, ok, type Result } from '../../src/result.ts'
 import { registerResult } from '../../src/result_registry.ts'
-import type { AnyOp } from '../../src/strategy.ts'
+import type { AnyOp, AnyStrategy, Op, Strategy } from '../../src/strategy.ts'
 import { Tenace } from '../../src/tenace.ts'
 import { AppErr, AppOk, type AppResult } from '../helpers/app_result.ts'
 import { type BoomError, Counter, Explode, type NotFound, Rescue } from '../helpers/strategies.ts'
@@ -165,3 +165,52 @@ const wider: Policy<readonly AnyOp[], unknown, unknown> = Tenace.policy().withTi
 const sWider = await wider.settle(fetchUser)
 expectType<Equal<typeof sWider, Result<unknown, unknown>>>()
 assertType<Policy<[], never, UnexpectedError | OtherError>>(Tenace.policy())
+
+/* ---- variance: a strategy that removes fewer errors produces more ---- */
+let removesAll = Tenace.policy().withFallback(() => null)
+// @ts-expect-error a policy that removes nothing is not one that removes everything
+removesAll = Tenace.policy().withFallbackWhen(
+  () => false,
+  () => null,
+)
+void removesAll
+// removing more errors than declared is fine
+assertType<Policy<[Op<never, never>], null, UnexpectedError | OtherError>>(
+  Tenace.policy().withFallback(() => null),
+)
+// @ts-expect-error a strategy that removes nothing is not one that removes everything
+assertType<Strategy<never, unknown>>(new Counter())
+assertType<Strategy<never, never, null>>(new Rescue(null))
+assertType<AnyStrategy>(new Rescue(null))
+assertType<AnyStrategy>(new Explode())
+
+/* ---- typing a policy parameter ---- */
+const runAny = async (policy: ReusablePolicy): Promise<void> => {
+  const value = await policy.execute(fetchUser)
+  expectType<Equal<typeof value, unknown>>()
+  const extended = await policy.withTimeout('1s').withRetry({ retries: 1 }).settle(fetchUser)
+  expectType<Equal<typeof extended, Result<unknown, unknown>>>()
+}
+const runPlain = async (policy: ReusablePolicy<never>): Promise<User> => policy.execute(fetchUser)
+void runAny(base)
+void runAny(rescued)
+void runPlain(exploding)
+// @ts-expect-error a fallback may succeed with another value
+void runPlain(rescued)
+// @ts-expect-error a bound policy runs no other function
+void runAny(call)
+// any policy, bound or not, can be inspected and extended, not run
+const describeAny = (policy: AnyPolicy): string[] => policy.with(new Counter()).describe()
+describeAny(call)
+// @ts-expect-error it may be bound
+const runAnyPolicy = (policy: AnyPolicy): Promise<unknown> => policy.execute(fetchUser)
+void runAnyPolicy
+
+// a generic wrapper returns the value of fn, Results unwrapped
+const withBase = async <T>(fn: () => Promise<T>): Promise<ValueOfReturn<Awaited<T>>> =>
+  base.execute(fn)
+const wrapped = await withBase(findUser)
+expectType<Equal<typeof wrapped, User>>()
+// @ts-expect-error a Result returned by fn is unwrapped: T is not the value
+const wrongWrapper = async <T>(fn: () => Promise<T>): Promise<T> => base.execute(fn)
+void wrongWrapper

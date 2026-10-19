@@ -60,7 +60,7 @@ const byPredicate = Tenace.policy<HttpError>().withFallbackWhen(
 )
 expectType<Equal<ErrorOf<typeof byPredicate>, HttpError | UnexpectedError>>()
 
-// a guard on a subclass removes the subclass only, not every error with its tag
+// a guard on a subclass with a member of its own removes the subclass only
 class NotFoundHttp extends HttpError {
   readonly notFound = true
 }
@@ -69,6 +69,29 @@ const bySubclass = Tenace.policy<HttpError>().withFallbackWhen(
   () => null,
 )
 expectType<Equal<ErrorOf<typeof bySubclass>, HttpError | UnexpectedError>>()
+
+// so does a guard on a subclass with its own tag
+class ApiError extends TenaceError {
+  readonly _tag: 'ApiError' | 'ApiNotFound' = 'ApiError'
+  readonly code = 'E_API' as const
+}
+class ApiNotFound extends ApiError {
+  override readonly _tag = 'ApiNotFound' as const
+}
+const byTaggedSubclass = Tenace.policy<ApiError>().withFallbackWhen(
+  error => error instanceof ApiNotFound,
+  error => (expectType<Equal<typeof error, ApiNotFound>>(), null),
+)
+expectType<Equal<ErrorOf<typeof byTaggedSubclass>, ApiError | UnexpectedError>>()
+
+// an empty subclass is the same type as its parent: a guard on it removes the parent too,
+// although instanceof does not match the parent at runtime (not detectable by types)
+class EmptyHttp extends HttpError {}
+const byEmptySubclass = Tenace.policy<HttpError>().withFallbackWhen(
+  error => error instanceof EmptyHttp,
+  () => null,
+)
+expectType<Equal<ErrorOf<typeof byEmptySubclass>, UnexpectedError>>()
 
 // untagged errors match structurally, so a guard on one of them removes nothing
 class AErr extends Error {}

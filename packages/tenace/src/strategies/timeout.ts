@@ -19,7 +19,7 @@ export interface TimeoutOptions {
    *
    * Any other value throws a `RangeError` when the policy is built.
    */
-  readonly mode?: 'aggressive' | 'cooperative'
+  readonly mode?: 'aggressive' | 'cooperative' | undefined
 }
 
 /**

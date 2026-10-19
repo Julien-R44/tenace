@@ -7,16 +7,16 @@ export interface StaleFallbackOptions {
   /**
    * Oldest value that may be served. Defaults to no limit.
    */
-  readonly maxAge?: Duration
+  readonly maxAge?: Duration | undefined
   /**
    * Keys remembered (least recently written are forgotten first). Defaults to `1000`.
    */
-  readonly maxEntries?: number
+  readonly maxEntries?: number | undefined
   /**
    * Key the value is remembered under. Defaults to the execution key; one of them is
    * required, so a value is never served to another function.
    */
-  readonly key?: string
+  readonly key?: string | undefined
 }
 
 /**

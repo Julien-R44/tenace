@@ -10,14 +10,18 @@ export type Next = (context: ExecutionContext) => Promise<AnyResult>
 
 /**
  * Type-level description of what a strategy does to the error channel:
- * `E' = Exclude<E, Removes> | Adds`.
+ * `E' = Exclude<E, Removes> | Adds`. `Removes` is contravariant: removing more errors
+ * produces fewer, so an op removing everything is assignable to one removing nothing.
  */
-export interface Op<out Adds, out Removes> {
+export interface Op<out Adds, in Removes> {
   readonly adds?: Adds
-  readonly removes?: Removes
+  readonly removes?: (error: Removes) => void
 }
 
-export type AnyOp = Op<unknown, unknown>
+/**
+ * Any op: it may add any error and remove none.
+ */
+export type AnyOp = Op<unknown, never>
 
 /**
  * A step of a policy (timeout, retry, circuit breaker...). Extend it to write your own.
@@ -42,7 +46,7 @@ export type AnyOp = Op<unknown, unknown>
  * Strategy instances are shared by identity: a stateful strategy (circuit breaker,
  * bulkhead) added to several policies shares its state between them.
  */
-export abstract class Strategy<out Adds = never, out Removes = never, out Value = never> {
+export abstract class Strategy<out Adds = never, in Removes = never, out Value = never> {
   /**
    * Phantom type carrier. Never set at runtime.
    */
@@ -60,7 +64,7 @@ export abstract class Strategy<out Adds = never, out Removes = never, out Value 
   }
 }
 
-export type AnyStrategy = Strategy<unknown, unknown, unknown>
+export type AnyStrategy = Strategy<unknown, never, unknown>
 
 /**
  * Whether the value extends `Strategy` of any copy of Tenace (`instanceof` fails across

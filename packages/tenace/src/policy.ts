@@ -60,38 +60,39 @@ export interface ExecuteOptions {
    * Aborting it stops the execution right away: the promise rejects with `signal.reason`
    * (like `fetch`), outside of the typed error channel.
    */
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
   /**
    * Clock used by time-based strategies of this execution. Defaults to the system clock.
    * Mostly useful with `TestClock` from `@julr/tenace/testing`.
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
   /**
    * Operation name reported to instrumentation. Overrides the policy name.
    */
-  readonly name?: string
+  readonly name?: string | undefined
   /**
    * Key of this execution, used by dedupe, cache, locks and rate limits that do not set
    * their own: `execute(() => getUser(id), { key: `user:${id}` })`.
    */
-  readonly key?: string
+  readonly key?: string | undefined
   /**
    * Set to `false` when running the function twice is not safe (payments, emails...).
-   * Retries then only retry calls that were rejected before running (open circuit, full
-   * bulkhead, rate limit, lock) and emit `retry.declined` for the others. Defaults to `true`.
+   * Retries then only retry calls that were rejected before running (full bulkhead, rate
+   * limit, lock, open circuit listed in `retryOn`) and emit `retry.declined` for the others.
+   * Defaults to `true`.
    */
-  readonly idempotent?: boolean
+  readonly idempotent?: boolean | undefined
   /**
    * Extra attributes reported to instrumentation (low cardinality).
    */
-  readonly attributes?: Attributes
+  readonly attributes?: Attributes | undefined
 }
 
 export interface PolicyOptions {
   /**
    * Operation name reported to instrumentation. Defaults to `tenace`.
    */
-  readonly name?: string
+  readonly name?: string | undefined
   /**
    * Instrumentation of this policy, added to the one set with `Tenace.instrument()` (the
    * global one wraps it; an instance already in the global one runs once). `false` turns
@@ -103,10 +104,23 @@ export interface PolicyOptions {
    * function at most once, and an instrumentation that settles without calling `run` is
    * reported and the execution runs without it.
    */
-  readonly instrumentation?: Instrumentation | false
+  readonly instrumentation?: Instrumentation | false | undefined
 }
 
+/**
+ * Any policy, bound by `Tenace.call(fn)` or not: to store policies, inspect them
+ * (`describe()`) or extend them with `.with()`. It may be bound, so it cannot run a
+ * function: type a parameter that runs one as `ReusablePolicy`.
+ */
 export type AnyPolicy = Policy<readonly AnyOp[], unknown, unknown, Fn | undefined>
+
+/**
+ * Any reusable policy (`Tenace.policy()`), as a parameter type: it runs any function with
+ * `.execute(fn)` / `.settle(fn)` and can be extended (`.withTimeout()`...). Its errors are
+ * `unknown`. `V` is what its fallbacks may succeed with: `ReusablePolicy<never>` accepts the
+ * policies without fallback values, and `execute(fn)` then resolves with the value of `fn`.
+ */
+export type ReusablePolicy<V = unknown> = Policy<readonly AnyOp[], V, unknown>
 
 const POLICY_BRAND: unique symbol = Symbol.for('@julr/tenace/policy') as never
 
@@ -135,7 +149,7 @@ function strategyOr<S extends AnyStrategy, O>(
 /**
  * Anything `.with()` accepts: a strategy, or a policy (inlined).
  */
-export type Composable = AnyStrategy | Policy<readonly AnyOp[], unknown, unknown, undefined>
+export type Composable = AnyStrategy | ReusablePolicy
 
 type OpsOf<X> =
   X extends Policy<infer Ops, unknown, unknown, undefined>
@@ -147,7 +161,7 @@ type OpsOf<X> =
 type ValuesOf<X> =
   X extends Policy<readonly AnyOp[], infer TAdd, unknown, undefined>
     ? TAdd
-    : X extends Strategy<unknown, unknown, infer Value>
+    : X extends Strategy<unknown, never, infer Value>
       ? Value
       : never
 
@@ -161,7 +175,8 @@ type ChainValue<Bound, TAdd> = Bound extends Fn ? BoundValue<Bound> | TAdd : unk
 type BoundError<Bound> = Bound extends Fn ? ErrorOfReturn<Returned<Bound>> : never
 
 /**
- * Errors seen by callbacks added at the end of a policy.
+ * Errors received by callbacks added at the end of a policy, undeclared ones (`OtherError`)
+ * included. Type a predicate shared by callbacks (`retryIf`...) with it.
  */
 export type CurrentError<P> =
   P extends Policy<infer Ops, unknown, infer EIn, Fn | undefined>
@@ -169,7 +184,9 @@ export type CurrentError<P> =
     : never
 
 /**
- * Errors a policy can produce, as seen by its callbacks (without undeclared errors).
+ * Errors a policy can produce, without undeclared errors (`OtherError`). Callbacks of a
+ * reusable policy also receive `OtherError`: type a predicate passed to them with
+ * `CurrentError`.
  */
 export type ErrorOf<P> = Exclude<CurrentError<P>, OtherError>
 
@@ -269,10 +286,10 @@ export class Policy<
    *   .withRetry({ retries: 3, delay: backoff.exponential(), retryOn: ['TimeoutError'] })
    * ```
    */
+  withRetry(options: RetryOptions<Fold<EIn | UnexpectedError, Ops>>): Policy<Ops, TAdd, EIn, Bound>
   withRetry(
     options: ValueRetryOptions<Fold<EIn | UnexpectedError, Ops>, ChainValue<Bound, TAdd>>,
   ): Policy<Ops, TAdd, EIn, Bound>
-  withRetry(options: RetryOptions<Fold<EIn | UnexpectedError, Ops>>): Policy<Ops, TAdd, EIn, Bound>
   withRetry(
     options: RetryOptions<never> | ValueRetryOptions<never, never>,
   ): Policy<Ops, TAdd, EIn, Bound> {
@@ -395,7 +412,9 @@ export class Policy<
    *
    * - A type guard (on TypeScript >= 5.5, `error => error instanceof NotFound` is inferred as
    *   one) narrows the handler argument and removes the guarded errors from the channel when
-   *   they all have a literal `_tag`. The guard must be exact: true for every `X`.
+   *   they all have a literal `_tag`. The guard must be exact: true for every `X`. A subclass
+   *   that adds nothing to its parent is the same type, so a guard on it removes the parent
+   *   too: give a guarded subclass its own `_tag` or a member of its own.
    * - A plain predicate handles the errors it matches but removes nothing from the channel.
    *
    * ```ts

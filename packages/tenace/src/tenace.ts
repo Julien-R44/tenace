@@ -7,12 +7,11 @@ import {
   overrideGlobalInstrumentation,
 } from './internal/global_instrumentation.ts'
 import { Chaos, type ChaosOptions } from './strategies/chaos.ts'
-import { type Fn, Policy, type PolicyOptions } from './policy.ts'
+import { type Fn, Policy, type PolicyOptions, type ReusablePolicy } from './policy.ts'
 import type { Result } from './result.ts'
 import type { AnyOp } from './strategy.ts'
 import { waitFor } from './wait_for.ts'
 
-type ReusablePolicy = Policy<readonly AnyOp[], unknown, unknown, undefined>
 type DefaultPolicy = Policy<[], never, OtherError>
 type OpsOf<P> = P extends Policy<infer Ops, unknown, unknown, undefined> ? Ops : []
 type ValueOf<P> = P extends Policy<readonly AnyOp[], infer TAdd, unknown, undefined> ? TAdd : never

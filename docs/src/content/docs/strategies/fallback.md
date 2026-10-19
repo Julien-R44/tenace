@@ -67,6 +67,27 @@ A fallback does not run when the signal is aborted.
 - **A type guard** narrows the error the handler receives, and removes the guarded errors from the channel when they all have a literal `_tag`. On TypeScript 5.5 and later, `error => error instanceof NotFound` is inferred as a type guard. A guard on untagged classes removes nothing, because they match structurally.
 - **A plain predicate** handles the errors it matches and removes nothing. The handler receives every error of the channel.
 
+Types are compared by structure. A subclass that adds nothing to its parent, such as `class NotFound extends HttpError {}`, is the same type as `HttpError`: a guard on it removes `HttpError` from the channel too, although `instanceof NotFound` is `false` for an `HttpError` at runtime. Give a guarded subclass its own `_tag`, or a member of its own:
+
+```ts
+import { Tenace, TenaceError } from '@julr/tenace'
+
+class ApiError extends TenaceError {
+  readonly _tag: 'ApiError' | 'ApiNotFound' = 'ApiError'
+  readonly code = 'E_API' as const
+}
+
+class ApiNotFound extends ApiError {
+  override readonly _tag = 'ApiNotFound' as const
+}
+
+const policy = Tenace.policy<ApiError>().withFallbackWhen(
+  error => error instanceof ApiNotFound,
+  () => null,
+)
+// ApiNotFound is handled, ApiError stays in the channel
+```
+
 Use a plain predicate when only some errors of a type are handled, such as an `HttpError` with status 404. A condition that also checks a field is not inferred as a type guard, so it stays a plain predicate:
 
 ```ts

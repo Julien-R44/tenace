@@ -60,7 +60,11 @@ export type TenaceEvent =
   | { readonly type: 'cache.miss'; readonly key: string }
   | { readonly type: 'cache.stale'; readonly key: string; readonly error: unknown }
   | { readonly type: 'cache.failed'; readonly key: string; readonly error: unknown }
-  | { readonly type: 'custom'; readonly name: string; readonly attributes?: Attributes }
+  | {
+      readonly type: 'custom'
+      readonly name: string
+      readonly attributes?: Attributes | undefined
+    }
 
 export interface ExecutionInfo {
   /**

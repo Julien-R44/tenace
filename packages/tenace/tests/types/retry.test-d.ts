@@ -1,7 +1,7 @@
 import { backoff } from '../../src/backoff.ts'
 import { TenaceError, type TimeoutError, type UnexpectedError } from '../../src/errors.ts'
 import type { OtherError } from '../../src/fold.ts'
-import type { ErrorOf } from '../../src/policy.ts'
+import type { CurrentError, ErrorOf } from '../../src/policy.ts'
 import type { Result } from '../../src/result.ts'
 import { Retry } from '../../src/strategies/retry.ts'
 import { Tenace } from '../../src/tenace.ts'
@@ -65,6 +65,14 @@ Tenace.policy().withRetry({ retries: 1, retryIf: error => error.status === 500 }
 // @ts-expect-error retries is required
 Tenace.policy().withRetry({ delay: 1 })
 
+// a shared predicate is typed with CurrentError: callbacks also receive OtherError
+const timedOut = Tenace.policy().withTimeout('1s')
+const isTransient = (error: CurrentError<typeof timedOut>): boolean => error._tag === 'TimeoutError'
+timedOut.withRetry({ retries: 1, retryIf: isTransient })
+const isTransientError = (error: ErrorOf<typeof timedOut>): boolean => error._tag === 'TimeoutError'
+// @ts-expect-error ErrorOf has no OtherError
+timedOut.withRetry({ retries: 1, retryIf: isTransientError })
+
 // comparing tags narrows even with undeclared errors in the union
 Tenace.policy<HttpError>().withRetry({
   retries: 1,
@@ -102,6 +110,8 @@ Tenace.policy().withRetry({
     return value instanceof Response && value.status >= 500
   },
 })
+// @ts-expect-error a reusable policy cannot assume the type of its value
+Tenace.policy().withRetry({ retries: 1, retryIfValue: (value: Res) => value.status === 503 })
 
 // without retryIfValue, onRetry and delay still see the error only
 Tenace.call(fetchLike).withRetry({

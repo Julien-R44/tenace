@@ -17,39 +17,39 @@ export interface ExponentialBackoffOptions {
   /**
    * Delay after the first failed attempt. Defaults to `100ms`.
    */
-  readonly base?: Duration
+  readonly base?: Duration | undefined
   /**
    * Multiplier between attempts, a finite number >= 1. Defaults to `2`.
    */
-  readonly factor?: number
+  readonly factor?: number | undefined
   /**
    * Upper bound, applied before jitter. Defaults to `30s`.
    */
-  readonly max?: Duration
+  readonly max?: Duration | undefined
   /**
    * Defaults to `full`.
    */
-  readonly jitter?: Jitter
+  readonly jitter?: Jitter | undefined
   /**
    * Source of randomness in `[0, 1)`, for tests. Defaults to `Math.random`.
    */
-  readonly random?: () => number
+  readonly random?: (() => number) | undefined
 }
 
 export interface LinearBackoffOptions {
   /**
    * Delay after the first failed attempt, added again at each attempt. Defaults to `100ms`.
    */
-  readonly base?: Duration
+  readonly base?: Duration | undefined
   /**
    * Upper bound, applied before jitter. Defaults to `30s`.
    */
-  readonly max?: Duration
+  readonly max?: Duration | undefined
   /**
    * Defaults to `none`.
    */
-  readonly jitter?: Jitter
-  readonly random?: () => number
+  readonly jitter?: Jitter | undefined
+  readonly random?: (() => number) | undefined
 }
 
 const JITTERS: ReadonlySet<unknown> = new Set<Jitter>(['full', 'equal', 'none'])

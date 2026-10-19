@@ -21,8 +21,8 @@ export interface CacheOptions {
   /**
    * Cache key. Defaults to the execution key; one of them is required.
    */
-  readonly key?: string
-  readonly ttl?: Duration
+  readonly key?: string | undefined
+  readonly ttl?: Duration | undefined
 }
 
 /**

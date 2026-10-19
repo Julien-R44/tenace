@@ -13,15 +13,15 @@ export interface BulkheadOptions {
   /**
    * Name used in events and `describe()`. Defaults to `bulkhead`.
    */
-  readonly name?: string
+  readonly name?: string | undefined
   /**
    * Calls waiting for a slot. Defaults to `0`: reject right away when every slot is busy.
    */
-  readonly queue?: number
+  readonly queue?: number | undefined
   /**
    * Longest time a call waits in the queue before being rejected. Defaults to no limit.
    */
-  readonly maxWait?: Duration
+  readonly maxWait?: Duration | undefined
 }
 
 function checkCount(name: string, value: number, min: number): number {

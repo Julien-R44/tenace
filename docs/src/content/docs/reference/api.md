@@ -104,13 +104,17 @@ The function receives a `Context`:
 | Type                             | Description                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `Result<T, E>`                   | `Ok<T> \| Err<E>`.                                                                                     |
-| `ErrorOf<P>`                     | The errors of policy `P`, as its callbacks see them, without `OtherError`.                             |
-| `CurrentError<P>`                | The errors the callbacks added at the end of `P` see, `OtherError` included.                           |
+| `ErrorOf<P>`                     | The errors of `P` without `OtherError`. Type a predicate passed to callbacks with `CurrentError`.      |
+| `CurrentError<P>`                | The errors the callbacks added at the end of `P` receive, `OtherError` included.                       |
 | `KnownError<E>`                  | `E` without `UnexpectedError`, `OtherError` included: the errors `execute()` rejects with as they are. |
 | `OtherError`                     | Stands for the errors a reusable policy did not declare.                                               |
+| `ReusablePolicy<V>`              | Any reusable policy, for a parameter that runs functions.                                              |
+| `AnyPolicy`                      | Any policy, bound or not. It cannot run a function.                                                    |
 | `ValueOf<R>`, `ErrorOfResult<R>` | The value and error types of a Result type.                                                            |
 | `TagOf<E>`, `ByTag<E, K>`        | The tags of an error union, and its members with tag `K`.                                              |
 | `Duration`                       | A number of milliseconds, or a string: `'250ms'`, `'1.5s'`, `'2m'`, `'1h'`, `'1d'`.                    |
+
+To type a parameter that receives a policy, see [Type a policy parameter](/concepts/reusable-and-bound-policies/#type-a-policy-parameter).
 
 ## Durations
 

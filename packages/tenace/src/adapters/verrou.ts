@@ -21,7 +21,7 @@ export interface VerrouAdapterOptions {
    * Delay between two attempts while the lock is held elsewhere. Defaults to `250ms`, like
    * Verrou.
    */
-  readonly retryDelay?: Duration
+  readonly retryDelay?: Duration | undefined
 }
 
 /**

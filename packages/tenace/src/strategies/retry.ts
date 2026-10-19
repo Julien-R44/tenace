@@ -37,30 +37,30 @@ interface BaseRetryOptions<E> {
   /**
    * Only retry errors with these tags. A `CircuitOpenError` is retried only when listed.
    */
-  readonly retryOn?: readonly TagOf<E>[]
+  readonly retryOn?: readonly TagOf<E>[] | undefined
   /**
    * Only retry errors for which it returns `true`. Combined with `retryOn`, both must agree.
    */
-  readonly retryIf?: (error: E, attempt: number) => boolean
+  readonly retryIf?: ((error: E, attempt: number) => boolean) | undefined
   /**
    * Shared cap on the share of retries. When exhausted, the last result is returned.
    */
-  readonly budget?: RetryBudget
+  readonly budget?: RetryBudget | undefined
   /**
    * Wait at least `error.retryAfterMs` when the error has one (rate limits, open circuits,
    * HTTP `Retry-After`). Defaults to `true`.
    */
-  readonly respectRetryAfter?: boolean
+  readonly respectRetryAfter?: boolean | undefined
   /**
    * Upper bound of the delay before a retry, `retryAfterMs` included. Defaults to no bound.
    */
-  readonly maxDelay?: Duration
+  readonly maxDelay?: Duration | undefined
   /**
    * Overrides the execution `idempotent` option. When `false`, only calls rejected before
    * running (full bulkhead, rate limit, lock, open circuit listed in `retryOn`) are retried,
    * never values.
    */
-  readonly idempotent?: boolean
+  readonly idempotent?: boolean | undefined
 }
 
 export interface RetryOptions<E = unknown> extends BaseRetryOptions<E> {
@@ -70,11 +70,11 @@ export interface RetryOptions<E = unknown> extends BaseRetryOptions<E> {
    * 30s max, full jitter). An `Infinity` delay (or `retryAfterMs`) stops retrying unless
    * `maxDelay` caps it, and returns the error, with a `retry.declined` event.
    */
-  readonly delay?: Duration | ((attempt: number, error: E) => Duration)
+  readonly delay?: Duration | ((attempt: number, error: E) => Duration) | undefined
   /**
    * Called before waiting for the next attempt.
    */
-  readonly onRetry?: (event: RetryEvent<E>) => void
+  readonly onRetry?: ((event: RetryEvent<E>) => void) | undefined
   readonly retryIfValue?: undefined
 }
 
@@ -92,11 +92,11 @@ export interface ValueRetryOptions<E = unknown, V = unknown> extends BaseRetryOp
   /**
    * Like `RetryOptions.delay`, with the cause of the retry instead of the error.
    */
-  readonly delay?: Duration | ((attempt: number, cause: RetryCause<E, V>) => Duration)
+  readonly delay?: Duration | ((attempt: number, cause: RetryCause<E, V>) => Duration) | undefined
   /**
    * Called before waiting for the next attempt.
    */
-  readonly onRetry?: (event: RetryEvent<E, V>) => void
+  readonly onRetry?: ((event: RetryEvent<E, V>) => void) | undefined
 }
 
 type AnyRetryOptions<E, V> = ValueRetryOptions<E, V> | RetryOptions<E>
@@ -105,7 +105,7 @@ type AnyRetryOptions<E, V> = ValueRetryOptions<E, V> | RetryOptions<E>
  * Options of a `Retry` built on its own: `retryOn` accepts any tag when the errors are unknown.
  */
 type Standalone<O, E> = unknown extends E
-  ? Omit<O, 'retryOn'> & { readonly retryOn?: readonly string[] }
+  ? Omit<O, 'retryOn'> & { readonly retryOn?: readonly string[] | undefined }
   : O
 
 const NOT_RUN_TAGS: ReadonlySet<unknown> = new Set([

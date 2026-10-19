@@ -101,3 +101,44 @@ const user = await Tenace.call(() => getUser(id))
 ```
 
 `Tenace.call()` throws a `TypeError` when its argument is not a function. The `execute()` and `settle()` methods of a reusable policy reject with a `TypeError` when they get no function.
+
+## Type a policy parameter
+
+A function that runs functions through a policy it receives takes a `ReusablePolicy`. It accepts any policy built with `Tenace.policy()`, and can extend it:
+
+```ts
+import { type ReusablePolicy, Tenace } from '@julr/tenace'
+
+async function loadUser(policy: ReusablePolicy, id: string): Promise<unknown> {
+  return policy.withTimeout('1s').execute(() => getUser(id))
+}
+
+await loadUser(Tenace.policy().withRetry({ retries: 2 }), '1')
+```
+
+Its fallbacks may succeed with any value, so `execute()` resolves with `unknown`. `ReusablePolicy<never>` only accepts policies without fallback values, and `execute(fn)` then resolves with the value of `fn`:
+
+```ts
+import type { ReusablePolicy } from '@julr/tenace'
+
+async function loadUser(policy: ReusablePolicy<never>, id: string): Promise<User> {
+  return policy.execute(() => getUser(id))
+}
+```
+
+`AnyPolicy` is any policy, bound or not. It may be bound, so it cannot run a function: use it to store or inspect policies.
+
+A generic wrapper cannot return `Promise<T>`: `execute()` unwraps a Result returned by the function, and `T` may be one. Return `ValueOfReturn<Awaited<T>>`:
+
+```ts
+import { Tenace, type ValueOfReturn } from '@julr/tenace'
+
+const policy = Tenace.policy().withTimeout('1s')
+
+// `Promise<T>` is a type error
+async function withPolicy<T>(fn: () => Promise<T>): Promise<ValueOfReturn<Awaited<T>>> {
+  return policy.execute(fn)
+}
+
+const body = await withPolicy(() => request('/users')) // string
+```

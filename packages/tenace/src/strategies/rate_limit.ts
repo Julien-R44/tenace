@@ -103,16 +103,16 @@ export type RateLimitOptions = (
   /**
    * Key to count calls against. Defaults to the execution key, then `default`.
    */
-  readonly key?: string
+  readonly key?: string | undefined
   /**
    * Wait for a slot instead of rejecting, when the wait is at most this long. Defaults to
    * `0` (reject right away).
    */
-  readonly maxWait?: Duration
+  readonly maxWait?: Duration | undefined
   /**
    * Clock passed to the store. Defaults to the clock of the execution.
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
 }
 
 /**

@@ -18,15 +18,15 @@ export interface Context {
 
 export interface ExecutionContextInit {
   readonly signal: AbortSignal
-  readonly attempt?: number
-  readonly clock?: Clock
-  readonly scope?: ExecutionScope
+  readonly attempt?: number | undefined
+  readonly clock?: Clock | undefined
+  readonly scope?: ExecutionScope | undefined
   readonly key?: string | undefined
-  readonly idempotent?: boolean
+  readonly idempotent?: boolean | undefined
   /**
    * `false` when nothing can abort `signal`. Defaults to `true`.
    */
-  readonly abortable?: boolean
+  readonly abortable?: boolean | undefined
 }
 
 /**

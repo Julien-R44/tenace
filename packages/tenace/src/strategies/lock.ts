@@ -27,7 +27,7 @@ export interface LockAcquireOptions {
   /**
    * Clock of the execution, for providers that wait in process.
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
 }
 
 /**
@@ -88,19 +88,19 @@ export interface LockOptions {
   /**
    * Defaults to an in-process provider shared by every lock without one.
    */
-  readonly provider?: LockProvider
+  readonly provider?: LockProvider | undefined
   /**
    * Lock key. Defaults to the execution key; one of them is required.
    */
-  readonly key?: string
+  readonly key?: string | undefined
   /**
    * Longest time to wait for the lock. Defaults to waiting as long as the signal allows.
    */
-  readonly timeout?: Duration
+  readonly timeout?: Duration | undefined
   /**
    * Expiration of the lock, for distributed providers.
    */
-  readonly ttl?: Duration
+  readonly ttl?: Duration | undefined
 }
 
 /**

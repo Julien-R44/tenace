@@ -14,7 +14,7 @@ export interface DedupeOptions {
    * Key identifying identical calls. Defaults to the execution key; one of them is
    * required, so calls of different functions are never merged.
    */
-  readonly key?: string
+  readonly key?: string | undefined
 }
 
 /**

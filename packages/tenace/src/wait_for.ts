@@ -17,19 +17,19 @@ export interface WaitForOptions {
    * done so far, such as `backoff.exponential()`. Delays under 1ms are rounded up to 1ms.
    * Defaults to `100ms`.
    */
-  readonly interval?: Duration | ((attempt: number) => Duration)
+  readonly interval?: Duration | ((attempt: number) => Duration) | undefined
   /**
    * Longest wait, from the call. `Infinity` waits until the signal aborts. Defaults to `10s`.
    */
-  readonly timeout?: Duration
+  readonly timeout?: Duration | undefined
   /**
    * Stops waiting. `waitFor` then rejects with `signal.reason`.
    */
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
   /**
    * Clock of the delays and the timeout. Defaults to the system clock.
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
 }
 
 /**

@@ -25,16 +25,16 @@ export interface OpenTelemetryOptions {
   /**
    * Defaults to `trace.getTracer('@julr/tenace')`, looked up on each execution.
    */
-  readonly tracer?: Tracer
+  readonly tracer?: Tracer | undefined
   /**
    * Defaults to `metrics.getMeter('@julr/tenace')`, looked up on each execution so a meter
    * provider registered later is used.
    */
-  readonly meter?: Meter
+  readonly meter?: Meter | undefined
   /**
    * Record a span event for each Tenace event. Defaults to `true`.
    */
-  readonly spanEvents?: boolean
+  readonly spanEvents?: boolean | undefined
 }
 
 const STATE_VALUE: Record<CircuitState, number> = {

@@ -252,7 +252,7 @@ test.group('openTelemetry', group => {
   })
 
   test('the global meter provider may be registered after openTelemetry()', async ({ assert }) => {
-    const instrumentation = openTelemetry()
+    const instrumentation = openTelemetry({ meter: undefined, spanEvents: undefined })
     const reader = new PullReader()
     metrics.setGlobalMeterProvider(new MeterProvider({ readers: [reader] }))
     try {

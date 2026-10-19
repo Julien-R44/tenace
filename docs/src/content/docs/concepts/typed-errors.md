@@ -87,7 +87,7 @@ A `_` handler takes every error without its own handler, including untagged erro
 
 ## Read the errors of a policy
 
-`ErrorOf<typeof policy>` is the error channel of a policy, as its callbacks see it:
+`ErrorOf<typeof policy>` is the error channel of a policy, without the undeclared errors (`OtherError`):
 
 ```ts
 import { type ErrorOf, Tenace } from '@julr/tenace'
@@ -95,6 +95,18 @@ import { type ErrorOf, Tenace } from '@julr/tenace'
 const policy = Tenace.policy().withTimeout('1s').withCircuitBreaker()
 
 type PolicyError = ErrorOf<typeof policy> // UnexpectedError | TimeoutError | CircuitOpenError
+```
+
+The callbacks of a reusable policy also receive `OtherError`, so a predicate typed with `ErrorOf` cannot be passed to them. Type it with `CurrentError`, which includes `OtherError`:
+
+```ts
+import { type CurrentError, Tenace } from '@julr/tenace'
+
+const base = Tenace.policy().withTimeout('1s')
+
+const isTransient = (error: CurrentError<typeof base>): boolean => error._tag === 'TimeoutError'
+
+const policy = base.withRetry({ retries: 2, retryIf: isTransient })
 ```
 
 The final `Result` type of `settle(fn)` is always exact for `fn`. What the callbacks of a reusable policy can see about the errors of `fn` is the subject of [Reusable and bound policies](/concepts/reusable-and-bound-policies/).

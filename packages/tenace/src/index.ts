@@ -50,6 +50,7 @@ export {
   type KnownError,
   Policy,
   type PolicyOptions,
+  type ReusablePolicy,
 } from './policy.ts'
 export {
   type AnyResult,

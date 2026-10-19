@@ -20,66 +20,67 @@ import { type CircuitBreakerStore, MemoryCircuitBreakerStore } from './store.ts'
  */
 export type TripOptions =
   | { readonly consecutive: number }
-  | { readonly rate: number; readonly calls: number; readonly minimumCalls?: number }
+  | { readonly rate: number; readonly calls: number; readonly minimumCalls?: number | undefined }
   | {
       readonly rate: number
       readonly duration: Duration
-      readonly minimumCalls?: number
-      readonly buckets?: number
+      readonly minimumCalls?: number | undefined
+      readonly buckets?: number | undefined
     }
 
 export interface CircuitBreakerOptions {
   /**
    * Name used in events and `describe()`. Defaults to `circuitBreaker`.
    */
-  readonly name?: string
+  readonly name?: string | undefined
   /**
    * When to open. Defaults to `{ consecutive: 5 }` (5 failures in a row).
    */
-  readonly trip?: TripOptions
+  readonly trip?: TripOptions | undefined
   /**
    * How long the circuit stays open before admitting trial calls. A duration, or a
    * function of the number of consecutive openings (a backoff preset works). Must be
    * finite: use `isolate()` to keep a circuit open. Defaults to `30s`.
    */
-  readonly openFor?: Duration | ((openCount: number) => Duration)
-  readonly halfOpen?: {
-    /**
-     * Trial calls admitted at the same time while half-open. Others are rejected right
-     * away. Defaults to `1`.
-     */
-    readonly permits?: number
-    /**
-     * Successful trial calls needed to close. Defaults to `permits`.
-     */
-    readonly successes?: number
-    /**
-     * A trial call still running after this long counts as a failure. Defaults to
-     * `openFor` when it is a fixed duration other than 0, `30s` otherwise.
-     */
-    readonly maxWait?: Duration
-  }
+  readonly openFor?: Duration | ((openCount: number) => Duration) | undefined
+  readonly halfOpen?:
+    | {
+        /**
+         * Trial calls admitted at the same time while half-open. Others are rejected right
+         * away. Defaults to `1`.
+         */
+        readonly permits?: number | undefined
+        /**
+         * Successful trial calls needed to close. Defaults to `permits`.
+         */
+        readonly successes?: number | undefined
+        /**
+         * A trial call still running after this long counts as a failure. Defaults to
+         * `openFor` when it is a fixed duration other than 0, `30s` otherwise.
+         */
+        readonly maxWait?: Duration | undefined
+      }
+    | undefined
   /**
    * How a finished call counts. By default errors are failures, except rejections from
    * other policies (`CircuitOpenError`, `BulkheadFullError`, `RateLimitError`,
    * `LockNotAcquiredError`), which are
    * ignored. Calls whose signal was aborted are always ignored.
    */
-  readonly classify?: (result: AnyResult) => CallOutcome
+  readonly classify?: ((result: AnyResult) => CallOutcome) | undefined
   /**
    * Called after each state change. An error it throws is reported with
    * `globalThis.reportError` and does not change the result of the call.
    */
-  readonly onStateChange?: (event: {
-    readonly from: CircuitState
-    readonly to: CircuitState
-  }) => void
-  readonly store?: CircuitBreakerStore
+  readonly onStateChange?:
+    | ((event: { readonly from: CircuitState; readonly to: CircuitState }) => void)
+    | undefined
+  readonly store?: CircuitBreakerStore | undefined
   /**
    * Clock for open durations and windows. Defaults to the system clock, not the clock of
    * the execution: the circuit is shared by every execution using it.
    */
-  readonly clock?: Clock
+  readonly clock?: Clock | undefined
 }
 
 const REJECTION_TAGS: ReadonlySet<unknown> = new Set([

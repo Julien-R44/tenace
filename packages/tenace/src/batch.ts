@@ -8,19 +8,19 @@ export interface BatchOptions<P> {
   /**
    * Policy every task runs through. Defaults to an empty policy.
    */
-  readonly policy?: P
+  readonly policy?: P | undefined
   /**
    * Tasks running at the same time. Defaults to all of them.
    */
-  readonly concurrency?: number
+  readonly concurrency?: number | undefined
 }
 
 export interface BatchRunOptions {
   /**
    * Aborting it aborts every task: the batch rejects with `signal.reason`.
    */
-  readonly signal?: AbortSignal
-  readonly clock?: Clock
+  readonly signal?: AbortSignal | undefined
+  readonly clock?: Clock | undefined
 }
 
 type Runner = (task: Fn, options: { signal: AbortSignal; clock?: Clock }) => Promise<unknown>

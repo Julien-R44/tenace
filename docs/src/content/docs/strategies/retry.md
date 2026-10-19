@@ -168,7 +168,7 @@ const response = await Tenace.call(({ signal }) => fetch(url, { signal }))
 
 - A retried value is dropped. For a `fetch` response, release its connection in `onRetry`: `if ('value' in event) void event.value.body?.cancel()`.
 - A value is never retried when the execution is not [idempotent](#idempotency): the call already ran.
-- On a bound call (`Tenace.call(fn)`), `value` has the type of the value of `fn`. On a reusable policy, the function is not known yet, so `value` is `unknown`: narrow it, for example with `instanceof Response`.
+- On a bound call (`Tenace.call(fn)`), `value` has the type of the value of `fn`. On a reusable policy, the function is not known yet, so `value` is `unknown`: narrow it, for example with `instanceof Response`. Annotating it, as in `(response: Response) => ...`, is a type error.
 
 ## Events
 

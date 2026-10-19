@@ -105,8 +105,11 @@ type LiteralTag<X> = X extends { readonly _tag: infer K extends string }
 /**
  * Errors a type guard removes from the channel: the guarded type itself, only when every
  * member it guards has a literal `_tag`. Errors with another tag (such as `UnexpectedError`)
- * can then never match it, and a subclass guard only removes what is assignable to the
- * subclass. Untagged classes match structurally, which proves nothing about what the guard
- * accepts at runtime, so they remove nothing.
+ * can then never match it. Untagged classes match structurally, which proves nothing about
+ * what the guard accepts at runtime, so they remove nothing.
+ *
+ * Types are compared by structure: a subclass that adds nothing to its parent is the same
+ * type, so a guard on it removes the parent too, although `instanceof` does not match the
+ * parent at runtime. A guarded subclass needs its own `_tag` or a member of its own.
  */
 export type GuardedTags<X> = [X] extends [{ readonly _tag: LiteralTag<X> }] ? X : never
