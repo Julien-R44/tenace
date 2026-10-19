@@ -1,4 +1,4 @@
-import { type Clock, systemClock } from './clock.ts'
+import { type Clock, systemClock, type TimerHandle } from './clock.ts'
 import type { Context } from './context.ts'
 import { type Duration, toMs } from './duration.ts'
 import { TimeoutError } from './errors.ts'
@@ -75,6 +75,8 @@ function poll(
   return new Promise<void>((resolve, reject) => {
     const controller = new AbortController()
     const { signal } = controller
+    let deadline: TimerHandle
+    let cancelParent: (() => void) | undefined
 
     const end = (failure?: { readonly error: unknown }): void => {
       if (signal.aborted) return
@@ -89,11 +91,12 @@ function poll(
       }
     }
 
-    const deadline =
-      timeoutMs === Number.POSITIVE_INFINITY
-        ? undefined
-        : clock.setTimeout(() => end({ error: new TimeoutError(timeoutMs) }), timeoutMs)
-    const cancelParent = parent ? onAbort(parent, () => end({ error: parent.reason })) : undefined
+    if (timeoutMs !== Number.POSITIVE_INFINITY) {
+      deadline = clock.setTimeout(() => end({ error: new TimeoutError(timeoutMs) }), timeoutMs)
+    }
+    // a clock may fire a timer of 0ms right away
+    if (signal.aborted) return
+    if (parent) cancelParent = onAbort(parent, () => end({ error: parent.reason }))
 
     const check = async (): Promise<void> => {
       for (let attempt = 1; ; attempt++) {

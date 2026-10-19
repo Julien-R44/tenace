@@ -551,6 +551,8 @@ test.group('backoff', () => {
   test('rejects invalid options', ({ assert }) => {
     assert.throws(() => backoff.exponential({ factor: 0.5 }), RangeError)
     assert.throws(() => backoff.exponential({ factor: Infinity }), RangeError)
+    assert.throws(() => backoff.exponential({ jitter: 'ful' as never }), RangeError)
+    assert.throws(() => backoff.linear({ jitter: 'random' as never }), RangeError)
     assert.throws(() => backoff.constant(-1), RangeError)
   })
 })

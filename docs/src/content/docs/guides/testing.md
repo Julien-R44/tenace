@@ -25,15 +25,15 @@ const result = await done // a TimeoutError, after three attempts
 
 `TestClock` has these methods:
 
-| Member                    | Description                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `new TestClock(startAt?)` | Starts at `startAt` milliseconds since the epoch, 0 by default.                                                            |
-| `now()`                   | The current time of the clock.                                                                                             |
-| `advance(duration)`       | Moves time forward by a finite duration and fires the due timers in order. Returns a promise.                              |
-| `runAll(limit?)`          | Fires every timer, including the timers they schedule, until none is left. Throws after `limit` timers, 10,000 by default. |
-| `pendingTimers`           | The number of timers waiting to fire.                                                                                      |
+| Member                    | Description                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `new TestClock(startAt?)` | Starts at `startAt` milliseconds since the epoch, 0 by default.                                                             |
+| `now()`                   | The current time of the clock.                                                                                              |
+| `advance(duration)`       | Moves time forward by a finite duration and fires the due timers in order. Returns a promise.                               |
+| `runAll(limit?)`          | Fires every timer, including the timers they schedule, until none is left. Rejects after `limit` timers, 10,000 by default. |
+| `pendingTimers`           | The number of timers waiting to fire.                                                                                       |
 
-`advance()` lets pending promise callbacks run between timers, so a timer scheduled after another one fires within the same call. Always `await` it. It takes a number of milliseconds or a string such as `'30s'`, and throws a `RangeError` for a negative, `NaN`, or infinite duration. A timer of `Infinity` never fires, not even with `runAll()`.
+`advance()` lets pending promise callbacks run between timers, so a timer scheduled after another one fires within the same call. It also lets a retry without delay go on after it yields to the event loop, every 100 retries. Always `await` it. It takes a number of milliseconds or a string such as `'30s'`, and rejects with a `RangeError` for a negative, `NaN`, or infinite duration. A timer of `Infinity` never fires, not even with `runAll()`.
 
 ### Which strategies follow the execution clock
 

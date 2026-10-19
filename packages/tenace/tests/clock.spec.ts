@@ -2,6 +2,7 @@ import { test } from '@japa/runner'
 
 import { systemClock } from '../src/clock.ts'
 import { sleep } from '../src/internal/sleep.ts'
+import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
 
 test.group('TestClock', () => {
@@ -45,6 +46,28 @@ test.group('TestClock', () => {
     await clock.advance(5)
     await done
     assert.deepEqual(steps, [10, 20, 30])
+  })
+
+  test('timers scheduled after a retry yields to the event loop fire too', async ({ assert }) => {
+    const clock = new TestClock()
+    const times: number[] = []
+    let settled = false
+    // 100 retries without delay make the retry yield, the 115th attempt waits 10ms again
+    void Tenace.policy()
+      .withRetry({ retries: 120, delay: attempt => (attempt === 1 || attempt === 115 ? 10 : 0) })
+      .settle(
+        () => {
+          times.push(clock.now())
+          throw new Error('down')
+        },
+        { clock },
+      )
+      .then(() => (settled = true))
+
+    await clock.advance(20)
+    assert.isTrue(settled)
+    assert.lengthOf(times, 121)
+    assert.equal(times.at(-1), 20)
   })
 
   test('clearTimeout cancels a timer', async ({ assert }) => {

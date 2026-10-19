@@ -153,6 +153,14 @@ test.group('Timeout | aggressive', () => {
     assert.throws(() => Tenace.policy().withTimeout(-1), RangeError)
     assert.throws(() => new Timeout('soon' as never), RangeError)
   })
+
+  test('rejects an invalid mode when the policy is built', ({ assert }) => {
+    assert.throws(
+      () => Tenace.policy().withTimeout(10, { mode: 'aggresive' as never }),
+      RangeError,
+      /Invalid timeout mode: aggresive/,
+    )
+  })
 })
 
 test.group('Timeout | cooperative', () => {

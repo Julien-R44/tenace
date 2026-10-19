@@ -52,6 +52,17 @@ export interface LinearBackoffOptions {
   readonly random?: () => number
 }
 
+const JITTERS: ReadonlySet<unknown> = new Set<Jitter>(['full', 'equal', 'none'])
+
+function checkJitter(jitter: Jitter): Jitter {
+  if (!JITTERS.has(jitter)) {
+    throw new RangeError(
+      `Invalid backoff jitter: ${String(jitter)}. Expected 'full', 'equal' or 'none'`,
+    )
+  }
+  return jitter
+}
+
 function applyJitter(delay: number, jitter: Jitter, random: () => number): number {
   if (delay === Number.POSITIVE_INFINITY) return delay
   if (jitter === 'full') return Math.round(delay * random())
@@ -79,7 +90,7 @@ export const backoff: {
   linear(options: LinearBackoffOptions = {}): BackoffFn {
     const base = toMs(options.base ?? 100)
     const max = toMs(options.max ?? '30s')
-    const jitter = options.jitter ?? 'none'
+    const jitter = checkJitter(options.jitter ?? 'none')
     const random = options.random ?? Math.random
     return attempt => applyJitter(Math.min(base * attempt, max), jitter, random)
   },
@@ -88,7 +99,7 @@ export const backoff: {
     const base = toMs(options.base ?? 100)
     const factor = options.factor ?? 2
     const max = toMs(options.max ?? '30s')
-    const jitter = options.jitter ?? 'full'
+    const jitter = checkJitter(options.jitter ?? 'full')
     const random = options.random ?? Math.random
     if (!(factor >= 1 && Number.isFinite(factor))) {
       throw new RangeError(`Invalid backoff factor: ${factor}. Expected a finite number >= 1`)

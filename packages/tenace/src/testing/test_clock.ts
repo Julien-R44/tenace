@@ -1,5 +1,6 @@
 import type { Clock, TimerHandle } from '../clock.ts'
 import { type Duration, toMs } from '../duration.ts'
+import { macrotask, pendingYields } from '../internal/sleep.ts'
 
 interface Timer {
   readonly id: number
@@ -7,8 +8,23 @@ interface Timer {
   readonly callback: () => void
 }
 
-const flushMacrotask = (): Promise<void> =>
-  new Promise(resolve => globalThis.setTimeout(resolve, 0))
+/**
+ * Waves of `yieldToEventLoop` a flush waits for at most: an endless loop of retries without
+ * delay never stops yielding, and must not stop time from moving.
+ */
+const MAX_YIELD_WAVES = 100
+
+/**
+ * Lets the code run until it waits on a timer: pending promise callbacks, and the code that
+ * yielded to the event loop (a retry yields every 100 retries without delay).
+ */
+async function flush(): Promise<void> {
+  await new Promise<void>(macrotask)
+  for (let wave = 0; pendingYields().size > 0 && wave < MAX_YIELD_WAVES; wave++) {
+    await Promise.all(pendingYields())
+    await new Promise<void>(macrotask)
+  }
+}
 
 /**
  * Manually driven clock for tests. Time only moves with `advance()` / `runAll()`. Timers of
@@ -53,6 +69,7 @@ export class TestClock implements Clock {
   /**
    * Moves time forward by a finite duration, firing due timers in order. Pending promise
    * callbacks run between timers, so timers scheduled by fired timers are honored too.
+   * Rejects with a `RangeError` for a negative, `NaN` or infinite duration.
    */
   async advance(duration: Duration): Promise<void> {
     const ms = toMs(duration)
@@ -62,7 +79,7 @@ export class TestClock implements Clock {
       )
     }
     const target = this.#now + ms
-    await flushMacrotask()
+    await flush()
 
     for (;;) {
       const next = this.#nextDue(target)
@@ -70,7 +87,7 @@ export class TestClock implements Clock {
       this.#timers = this.#timers.filter(timer => timer !== next)
       this.#now = next.at
       next.callback()
-      await flushMacrotask()
+      await flush()
     }
 
     this.#now = target
@@ -78,10 +95,10 @@ export class TestClock implements Clock {
 
   /**
    * Fires every timer, including the ones scheduled while running, until none is left
-   * (except the ones of `Infinity`). Throws after `limit` timers to surface infinite timer loops.
+   * (except the ones of `Infinity`). Rejects after `limit` timers to surface infinite timer loops.
    */
   async runAll(limit = 10_000): Promise<void> {
-    await flushMacrotask()
+    await flush()
     for (let fired = 0; ; fired++) {
       const next = this.#nextDue(Number.MAX_VALUE) // timers of `Infinity` never fire
       if (!next) break
@@ -89,7 +106,7 @@ export class TestClock implements Clock {
       this.#timers = this.#timers.filter(timer => timer !== next)
       this.#now = Math.max(this.#now, next.at)
       next.callback()
-      await flushMacrotask()
+      await flush()
     }
   }
 

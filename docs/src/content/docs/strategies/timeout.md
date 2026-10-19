@@ -24,7 +24,7 @@ new Timeout(duration: Duration, options?: TimeoutOptions)
 | ------ | ------------------------------- | -------------- | -------------------------------------------------- |
 | `mode` | `'aggressive' \| 'cooperative'` | `'aggressive'` | What happens at the deadline. See [Modes](#modes). |
 
-`duration` is a number of milliseconds or a string such as `'500ms'`, `'1.5s'`, or `'2m'`. `Infinity` disables the timeout. A negative or malformed duration throws a `RangeError` when the policy is built.
+`duration` is a number of milliseconds or a string such as `'500ms'`, `'1.5s'`, or `'2m'`. `Infinity` disables the timeout. A negative or malformed duration, or an unknown `mode`, throws a `RangeError` when the policy is built.
 
 A `Timeout` instance exposes `timeoutMs` and `mode`.
 

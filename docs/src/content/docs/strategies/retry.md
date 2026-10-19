@@ -70,7 +70,7 @@ Callbacks must not throw. A throwing `retryIf`, `delay`, or `onRetry` is a bug, 
 
 The default is `backoff.exponential()`: 100 ms after the first failure, doubled each time, capped at 30 seconds, with full jitter.
 
-A delay of `Infinity`, or a `retryAfterMs` of `Infinity`, stops the retries unless `maxDelay` caps it: the retry returns the error and emits `retry.declined` with the reason `delay`.
+A delay of `Infinity`, or a `retryAfterMs` of `Infinity`, stops the retries unless `maxDelay` caps it: the retry returns the last result and emits `retry.declined` with the reason `delay`.
 
 | Preset                         | Delay after attempt `n`                     | Options and defaults                                                   |
 | ------------------------------ | ------------------------------------------- | ---------------------------------------------------------------------- |
@@ -78,7 +78,7 @@ A delay of `Infinity`, or a `retryAfterMs` of `Infinity`, stops the retries unle
 | `backoff.linear(options)`      | `base * n`, capped at `max`                 | `base: '100ms'`, `max: '30s'`, `jitter: 'none'`, `random`              |
 | `backoff.exponential(options)` | `base * factor ** (n - 1)`, capped at `max` | `base: '100ms'`, `factor: 2`, `max: '30s'`, `jitter: 'full'`, `random` |
 
-The cap applies before the jitter. `factor` must be a finite number of 1 or more. `random` replaces `Math.random`, which helps in tests.
+The cap applies before the jitter. `factor` must be a finite number of 1 or more, and `jitter` one of the values below: anything else throws a `RangeError`. `random` replaces `Math.random`, which helps in tests.
 
 | Jitter  | Delay                                                                                         |
 | ------- | --------------------------------------------------------------------------------------------- |
@@ -110,7 +110,7 @@ const listUsersPolicy = Tenace.policy().withRetry({ retries: 3, budget })
 | `window`       | `Duration` | `'10s'`             | Window over which executions and retries are counted.        |
 | `clock`        | `Clock`    | the execution clock | Clock that moves the window.                                 |
 
-Over the window, the budget allows `minPerSecond * window in seconds + ratio * executions` retries. Each execution of a retry that uses the budget counts once. When the budget is exhausted, the retry returns the last error and emits `retry.declined` with the reason `budget`.
+Over the window, the budget allows `minPerSecond * window in seconds + ratio * executions` retries. Each execution of a retry that uses the budget counts once. When the budget is exhausted, the retry returns the last result, an error or a value rejected by `retryIfValue`, and emits `retry.declined` with the reason `budget`.
 
 ## Idempotency
 

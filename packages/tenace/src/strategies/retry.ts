@@ -67,8 +67,8 @@ export interface RetryOptions<E = unknown> extends BaseRetryOptions<E> {
   /**
    * Delay before each retry: a fixed duration, a backoff preset, or a function of the
    * failed attempt and its error. Defaults to `backoff.exponential()` (100ms base, x2,
-   * 30s max, full jitter). An `Infinity` delay (or `retryAfterMs`) stops retrying and
-   * returns the error, with a `retry.declined` event.
+   * 30s max, full jitter). An `Infinity` delay (or `retryAfterMs`) stops retrying unless
+   * `maxDelay` caps it, and returns the error, with a `retry.declined` event.
    */
   readonly delay?: Duration | ((attempt: number, error: E) => Duration)
   /**

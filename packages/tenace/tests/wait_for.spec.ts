@@ -89,6 +89,26 @@ test.group('waitFor', () => {
     assert.equal(clock.pendingTimers, 0)
   })
 
+  test('a clock firing a timeout of 0 right away rejects with a TimeoutError', async ({
+    assert,
+  }) => {
+    const parent = new AbortController()
+    const clock = {
+      now: () => 0,
+      setTimeout: (callback: () => void) => (callback(), 0),
+      clearTimeout: () => {},
+    }
+    let called = false
+    const error = await waitFor(() => (called = true), {
+      timeout: 0,
+      signal: parent.signal,
+      clock,
+    }).catch((caught: unknown) => caught)
+
+    assert.instanceOf(error, TimeoutError)
+    assert.isFalse(called)
+  })
+
   test('rejects with the abort reason and stops checking', async ({ assert }) => {
     const clock = new TestClock()
     const controller = new AbortController()

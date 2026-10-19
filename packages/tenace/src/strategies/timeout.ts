@@ -16,6 +16,8 @@ export interface TimeoutOptions {
    *   none.
    * - `cooperative`: aborts the signal at the deadline, then waits for the function to
    *   settle. A failure after the deadline becomes `TimeoutError`, a success is kept.
+   *
+   * Any other value throws a `RangeError` when the policy is built.
    */
   readonly mode?: 'aggressive' | 'cooperative'
 }
@@ -32,7 +34,13 @@ export class Timeout extends Strategy<TimeoutError> {
   constructor(duration: Duration, options: TimeoutOptions = {}) {
     super()
     this.timeoutMs = toMs(duration)
-    this.mode = options.mode ?? 'aggressive'
+    const mode = options.mode ?? 'aggressive'
+    if (mode !== 'aggressive' && mode !== 'cooperative') {
+      throw new RangeError(
+        `Invalid timeout mode: ${String(mode)}. Expected 'aggressive' or 'cooperative'`,
+      )
+    }
+    this.mode = mode
   }
 
   async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
