@@ -240,8 +240,10 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
     if (this.#lastState === undefined && this.#tracks(context)) {
       this.#lastState = await this.#store.state(this.#clock.now(), this.config)
     }
-    const admission = await this.#store.admit(this.#clock.now(), this.config)
-    await this.#notify(context)
+    const admitted = this.#store.admit(this.#clock.now(), this.config)
+    // the memory store is synchronous: awaiting its values costs microtask hops on every call
+    const admission = admitted instanceof Promise ? await admitted : admitted
+    if (this.#tracks(context)) await this.#notify(context)
     if (!admission.admitted) {
       const { state, retryAfterMs } = admission
       context.emit({ type: 'circuit.rejected', breaker: this.name, state, retryAfterMs })
@@ -254,8 +256,9 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
       if (!context.signal.aborted) outcome = this.#classify(result)
       return result
     } finally {
-      await this.#store.record(admission.ticket, outcome, this.#clock.now(), this.config)
-      await this.#notify(context)
+      const recorded = this.#store.record(admission.ticket, outcome, this.#clock.now(), this.config)
+      if (recorded instanceof Promise) await recorded
+      if (this.#tracks(context)) await this.#notify(context)
     }
   }
 
