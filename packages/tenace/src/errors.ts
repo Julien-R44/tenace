@@ -18,13 +18,20 @@ export abstract class TenaceError extends Error {
 
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options)
-    Object.defineProperty(this, 'name', {
-      value: new.target.name,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    })
-    Object.defineProperty(this, ERROR_BRAND, { value: true })
+    // once per class: defining properties on every instance is slow
+    const prototype = new.target.prototype
+    if (!Object.hasOwn(prototype, 'name')) {
+      Object.defineProperty(prototype, 'name', {
+        value: new.target.name,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      })
+    }
+  }
+
+  static {
+    Object.defineProperty(this.prototype, ERROR_BRAND, { value: true })
   }
 
   static override [Symbol.hasInstance](value: unknown): boolean {
