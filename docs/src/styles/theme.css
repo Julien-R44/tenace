@@ -1,0 +1,357 @@
+/*
+ * Tenace docs theme: one dark theme, Geist, hairline borders, and a single accent.
+ * Unlayered rules here win over the Starlight cascade layers.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --tn-bg: #07080a;
+  --tn-surface: #0c0d10;
+  --tn-surface-2: #121317;
+  --tn-hairline: rgb(255 255 255 / 0.08);
+  --tn-hairline-strong: rgb(255 255 255 / 0.14);
+  --tn-accent: #8b8cff;
+  /* Second color of the dithered images */
+  --tn-accent-2: #6ee7f9;
+
+  --sl-font: 'Geist Variable';
+  --sl-font-mono: 'Geist Mono Variable';
+
+  --sl-color-white: #f4f4f5;
+  --sl-color-gray-1: #e4e4e7;
+  --sl-color-gray-2: #a1a1aa;
+  --sl-color-gray-3: #7c7c86;
+  --sl-color-gray-4: #52525b;
+  --sl-color-gray-5: #27272a;
+  --sl-color-gray-6: #141417;
+  --sl-color-black: var(--tn-bg);
+
+  --sl-color-accent-low: color-mix(in oklab, var(--tn-accent) 18%, var(--tn-bg));
+  --sl-color-accent: var(--tn-accent);
+  --sl-color-accent-high: color-mix(in oklab, var(--tn-accent) 45%, white);
+
+  --sl-color-text: var(--sl-color-gray-2);
+  --sl-color-text-accent: var(--sl-color-white);
+  --sl-color-bg: var(--tn-bg);
+  --sl-color-bg-nav: rgb(7 8 10 / 0.72);
+  --sl-color-bg-sidebar: var(--tn-bg);
+  --sl-color-bg-inline-code: var(--tn-surface-2);
+  --sl-color-hairline-light: var(--tn-hairline-strong);
+  --sl-color-hairline: var(--tn-hairline);
+  --sl-color-hairline-shade: var(--tn-bg);
+
+  --sl-text-body: 0.9375rem;
+  --sl-text-h1: 2.5rem;
+  --sl-text-h2: 1.625rem;
+  --sl-text-h3: 1.25rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-line-height: 1.7;
+  --sl-line-height-headings: 1.2;
+
+  --sl-nav-height: 3.75rem;
+  --sl-sidebar-width: 17rem;
+  --sl-content-width: 46rem;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--tn-accent) 35%, transparent);
+  color: #fff;
+}
+
+body {
+  background: var(--tn-bg);
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+header.header {
+  border-bottom: 1px solid var(--tn-hairline);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+}
+
+.site-title {
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sl-color-white);
+}
+.site-title img {
+  height: 1.75rem;
+}
+
+site-search button[data-open-modal] {
+  border: 1px solid var(--tn-hairline);
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.02);
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  transition: border-color 150ms ease;
+}
+site-search button[data-open-modal]:hover {
+  border-color: var(--tn-hairline-strong);
+  color: var(--sl-color-gray-2);
+}
+site-search button[data-open-modal] kbd {
+  background: rgb(255 255 255 / 0.06);
+  border-radius: 0.3rem;
+  font-family: var(--__sl-font-mono);
+}
+
+/* No theme picker, so no divider after the social links */
+.social-icons::after {
+  display: none;
+}
+.social-icons a {
+  color: var(--sl-color-gray-3);
+}
+.social-icons a:hover {
+  color: var(--sl-color-white);
+}
+
+/* Sidebar */
+.sidebar-pane {
+  border-inline-end: 1px solid var(--tn-hairline);
+}
+
+.sidebar-content {
+  font-size: var(--sl-text-sm);
+}
+
+.sidebar-content .top-level > li > details > summary .group-label > span {
+  font-family: var(--__sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
+.sidebar-content a {
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.375rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.sidebar-content a:hover {
+  background: rgb(255 255 255 / 0.04);
+  color: var(--sl-color-white);
+}
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: rgb(255 255 255 / 0.07);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+.sidebar-content ul ul {
+  border-inline-start-color: var(--tn-hairline);
+}
+
+/* Right sidebar */
+.right-sidebar {
+  border-inline-start: 1px solid var(--tn-hairline);
+}
+.right-sidebar h2 {
+  font-family: var(--__sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+starlight-toc a {
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+starlight-toc a:hover {
+  color: var(--sl-color-white);
+}
+starlight-toc a[aria-current='true'] {
+  color: var(--sl-color-white);
+}
+
+/* Page title */
+.content-panel {
+  border-top-color: var(--tn-hairline);
+}
+:root:not([data-has-hero]) h1#_top {
+  font-size: var(--sl-text-h1);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--sl-color-white);
+}
+
+/* Markdown content */
+.sl-markdown-content :is(h2, h3, h4, h5):not(:where(.not-content *)) {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--sl-color-white);
+}
+/* Starlight wraps headings in a flex container, so the rule goes on the wrapper */
+.sl-markdown-content .sl-heading-wrapper.level-h2:not(:where(.not-content *)) {
+  margin-top: 2.75rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--tn-hairline);
+}
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6):not(:where(.not-content *)) + * {
+  margin-top: 0.75rem;
+}
+.sl-markdown-content strong:not(:where(.not-content *)) {
+  color: var(--sl-color-gray-1);
+  font-weight: 600;
+}
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-white);
+  text-decoration-color: rgb(255 255 255 / 0.3);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 120ms ease;
+}
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  text-decoration-color: var(--tn-accent);
+}
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--tn-hairline);
+  border-radius: 0.3rem;
+  background: var(--tn-surface);
+  color: var(--sl-color-gray-1);
+  font-size: 0.85em;
+}
+
+/* Tables */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: var(--sl-text-sm);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--tn-hairline);
+  border-radius: 0.625rem;
+}
+.sl-markdown-content :is(th, td) {
+  padding: 0.6rem 0.875rem;
+  border-bottom: 1px solid var(--tn-hairline);
+  vertical-align: top;
+}
+.sl-markdown-content tr:last-child td {
+  border-bottom: 0;
+}
+.sl-markdown-content th {
+  background: var(--tn-surface);
+  font-family: var(--__sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+  border-bottom: 1px solid var(--tn-hairline);
+}
+.sl-markdown-content td:first-child code {
+  white-space: nowrap;
+  color: var(--sl-color-white);
+}
+.sl-markdown-content tbody tr:hover td {
+  background: rgb(255 255 255 / 0.015);
+}
+
+/* Asides */
+.starlight-aside {
+  border: 1px solid var(--tn-hairline);
+  border-inline-start: 2px solid var(--sl-color-asides-border);
+  border-radius: 0.5rem;
+  background: var(--tn-surface);
+}
+.starlight-aside__title {
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+}
+
+/* Steps */
+.sl-steps > li::before {
+  background: var(--tn-surface-2);
+  border: 1px solid var(--tn-hairline-strong);
+  color: var(--sl-color-white);
+  font-family: var(--__sl-font-mono);
+  font-size: 0.75rem;
+}
+.sl-steps > li::after {
+  background: var(--tn-hairline);
+}
+
+/* Tabs */
+starlight-tabs [role='tablist'] {
+  border-bottom-color: var(--tn-hairline);
+}
+starlight-tabs [role='tab'] {
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+}
+starlight-tabs [role='tab'][aria-selected='true'] {
+  color: var(--sl-color-white);
+  box-shadow: inset 0 -2px 0 var(--sl-color-white);
+}
+
+/* Footer and pagination */
+.pagination-links a {
+  border: 1px solid var(--tn-hairline);
+  border-radius: 0.625rem;
+  box-shadow: none;
+  background: transparent;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.pagination-links a:hover {
+  border-color: var(--tn-hairline-strong);
+  background: rgb(255 255 255 / 0.02);
+}
+.pagination-links .link-title {
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-base);
+  font-weight: 500;
+}
+.meta,
+.meta a {
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+
+/* Search modal */
+site-search dialog {
+  border: 1px solid var(--tn-hairline-strong);
+  border-radius: 0.875rem;
+  background: var(--tn-surface);
+}
+:root {
+  --pagefind-ui-background: var(--tn-surface);
+  --pagefind-ui-border: var(--tn-hairline-strong);
+  --pagefind-ui-tag: var(--tn-surface-2);
+  --pagefind-ui-font: var(--__sl-font);
+}
+
+/* Landing page */
+[data-has-hero] .content-panel {
+  border-top: 0;
+  padding-bottom: 0;
+}
+[data-has-hero] .sl-container {
+  max-width: 68rem;
+}
+[data-has-hero] main {
+  padding-bottom: 0;
+}
+/* The landing renders its own footer, and Starlight's one is empty there */
+[data-has-hero] .sl-markdown-content + footer {
+  display: none;
+}
+
+/* The hero spans 100vw, which includes a classic scrollbar, so clip the overflow */
+:root[data-has-hero] body {
+  overflow-x: clip;
+}

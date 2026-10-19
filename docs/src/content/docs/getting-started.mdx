@@ -1,0 +1,145 @@
+---
+title: Getting started
+description: Build a first policy with a timeout, retries, and a fallback, then read its outcome as a typed Result.
+---
+
+import { Steps } from '@astrojs/starlight/components'
+
+In this tutorial, we build a policy around a slow function. We give each attempt a timeout, retry the attempts that time out, add a fallback value, and then read the outcome as a typed `Result`.
+
+You need Node.js 22.18 or later, which runs TypeScript files directly.
+
+<Steps>
+
+1. Create a project and install Tenace.
+
+   ```sh
+   mkdir tenace-tutorial && cd tenace-tutorial
+   pnpm init && pnpm pkg set type=module
+   pnpm add @julr/tenace
+   ```
+
+   With npm, run `npm init -y`, `npm pkg set type=module`, and `npm install @julr/tenace` instead.
+
+2. Create `profile.ts` with a function that hangs on its first two attempts and succeeds on the third. It stops when its `signal` aborts, like `fetch` does.
+
+   ```ts title="profile.ts"
+   import { type Context, Tenace } from '@julr/tenace'
+
+   async function fetchProfile({ signal, attempt }: Context): Promise<{ name: string }> {
+     console.log(`attempt ${attempt}`)
+     if (attempt < 3) {
+       await new Promise((_resolve, reject) => {
+         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+       })
+     }
+     return { name: 'Ada' }
+   }
+
+   const policy = Tenace.policy().withTimeout('100ms')
+
+   try {
+     await policy.execute(fetchProfile)
+   } catch (error) {
+     console.log(String(error))
+   }
+   ```
+
+   Run it:
+
+   ```sh
+   node profile.ts
+   ```
+
+   The first attempt hangs, so the timeout aborts it after 100 ms and the policy rejects:
+
+   ```txt
+   attempt 1
+   TimeoutError: Operation timed out after 100ms
+   ```
+
+3. Retry the attempts that time out. Replace the policy and the `try` block with the following code:
+
+   ```ts title="profile.ts"
+   import { backoff, Tenace } from '@julr/tenace'
+
+   const policy = Tenace.policy()
+     .withTimeout('100ms')
+     .withRetry({
+       retries: 3,
+       delay: backoff.exponential({ base: '50ms' }),
+       retryOn: ['TimeoutError'],
+     })
+
+   console.log(await policy.execute(fetchProfile))
+   ```
+
+   The timeout comes first, so it bounds each attempt. The retry wraps it and starts a new attempt after each `TimeoutError`:
+
+   ```txt
+   attempt 1
+   attempt 2
+   attempt 3
+   { name: 'Ada' }
+   ```
+
+4. Add a fallback for the case where every attempt times out. Lower `retries` to `1` to see it:
+
+   ```ts title="profile.ts"
+   import { Tenace } from '@julr/tenace'
+
+   const policy = Tenace.policy()
+     .withTimeout('100ms')
+     .withRetry({ retries: 1, delay: '50ms', retryOn: ['TimeoutError'] })
+     .withFallbackOn(['TimeoutError'], () => ({ name: 'Guest' }))
+
+   console.log(await policy.execute(fetchProfile))
+   console.log(policy.describe())
+   ```
+
+   Two attempts time out, then the fallback returns its value. `describe()` lists the strategies from the outermost to the innermost:
+
+   ```txt
+   attempt 1
+   attempt 2
+   { name: 'Guest' }
+   [ 'fallback', 'retry', 'timeout' ]
+   ```
+
+5. Read the outcome as a `Result` instead of a promise that may reject. Remove the fallback, call `settle()`, and handle each case with `match()`:
+
+   ```ts title="profile.ts"
+   import { match, Tenace } from '@julr/tenace'
+
+   const policy = Tenace.policy()
+     .withTimeout('100ms')
+     .withRetry({ retries: 1, delay: '50ms', retryOn: ['TimeoutError'] })
+
+   const result = await policy.settle(fetchProfile)
+
+   console.log(
+     match(result, {
+       ok: profile => `Hello ${profile.name}`,
+       TimeoutError: error => `Timed out after ${error.timeoutMs}ms`,
+       UnexpectedError: error => `Failed: ${String(error.cause)}`,
+     }),
+   )
+   ```
+
+   ```txt
+   attempt 1
+   attempt 2
+   Timed out after 100ms
+   ```
+
+   `match()` requires one handler per error the policy can produce. Remove the `TimeoutError` handler and TypeScript reports the missing case.
+
+</Steps>
+
+We built a policy that bounds each attempt, retries timeouts with exponential backoff, falls back to a default value, and reports its errors in the type of its `Result`.
+
+## Next steps
+
+- [Strategy order](/concepts/strategy-order/) explains why the timeout came before the retry.
+- [`execute()` and `settle()`](/concepts/execute-and-settle/) compares the two ways to run a policy.
+- [Typed errors](/concepts/typed-errors/) shows how your own errors join the error channel.

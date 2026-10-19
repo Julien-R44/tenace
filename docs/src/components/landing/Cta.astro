@@ -1,0 +1,78 @@
+---
+import Actions from './Actions.astro'
+import Dither from './Dither.astro'
+---
+
+<section class="cta not-content">
+  <div class="bg" aria-hidden="true">
+    <Dither focusX={0.6} focusY={0.4} />
+  </div>
+  <p class="label">Get started</p>
+  <h2>Start with one policy.</h2>
+  <p class="text">Add a timeout and a retry to one call. Grow from there.</p>
+  <Actions center stack />
+  <!-- The footer sits on the same background, down to the bottom of the page -->
+  <div class="end">
+    <slot />
+  </div>
+</section>
+
+<style>
+  .cta {
+    position: relative;
+    isolation: isolate;
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    padding: 8rem 1.5rem 0;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    mask-image: linear-gradient(to bottom, transparent, rgb(0 0 0 / 0.6) 55%, #000);
+  }
+  .bg :global(.dither) {
+    opacity: 0.5;
+  }
+
+  /* Darkens the bottom of the image so the footer stays readable */
+  .cta::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    z-index: -1;
+    height: 10rem;
+    background: linear-gradient(to bottom, transparent, rgb(7 8 10 / 0.85));
+  }
+
+  .end {
+    max-width: 68rem;
+    margin: 8rem auto 0;
+    text-align: start;
+  }
+
+  .label {
+    margin: 0 0 0.75rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tn-accent);
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.125rem);
+    line-height: 1.1;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    color: var(--sl-color-white);
+  }
+  .text {
+    margin: 0.75rem 0 1.75rem;
+    font-size: 0.9375rem;
+    color: var(--sl-color-gray-2);
+  }
+</style>

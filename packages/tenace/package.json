@@ -1,0 +1,108 @@
+{
+  "name": "@julr/tenace",
+  "version": "2.0.0-next.0",
+  "description": "Typed, composable resilience policies for TypeScript: retry, timeout, circuit breaker, bulkhead, fallback and more",
+  "keywords": [
+    "backoff",
+    "bulkhead",
+    "circuit-breaker",
+    "fault-tolerance",
+    "resilience",
+    "retry",
+    "tenace",
+    "timeout",
+    "typed-errors"
+  ],
+  "license": "MIT",
+  "author": "Julien Ripouteau <julien@ripouteau.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/julien-r44/tenace.git",
+    "directory": "packages/tenace"
+  },
+  "files": [
+    "build"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "tenace-source": "./src/index.ts",
+      "default": "./build/index.js"
+    },
+    "./testing": {
+      "tenace-source": "./src/testing/index.ts",
+      "default": "./build/testing/index.js"
+    },
+    "./adapters/rate-limiter-flexible": {
+      "tenace-source": "./src/adapters/rate_limiter_flexible.ts",
+      "default": "./build/adapters/rate_limiter_flexible.js"
+    },
+    "./adapters/verrou": {
+      "tenace-source": "./src/adapters/verrou.ts",
+      "default": "./build/adapters/verrou.js"
+    },
+    "./adapters/bentocache": {
+      "tenace-source": "./src/adapters/bentocache.ts",
+      "default": "./build/adapters/bentocache.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "scripts": {
+    "clean": "del-cli build",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "typecheck:ts5": "node ./node_modules/typescript-5/bin/tsc --noEmit",
+    "test": "node --conditions=tenace-source --import=@poppinss/ts-exec --enable-source-maps bin/test.ts",
+    "test:bun": "bun --conditions=tenace-source bin/test.ts",
+    "release": "release-it",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@japa/assert": "catalog:",
+    "@japa/runner": "catalog:",
+    "@poppinss/ts-exec": "catalog:",
+    "@release-it/conventional-changelog": "^12.0.2",
+    "@types/node": "catalog:",
+    "@verrou/core": "catalog:",
+    "bentocache": "catalog:",
+    "del-cli": "catalog:",
+    "rate-limiter-flexible": "catalog:",
+    "release-it": "^21.1.1",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "typescript-5": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "release-it": {
+    "git": {
+      "requireCleanWorkingDir": true,
+      "requireUpstream": true,
+      "commitMessage": "chore(release): @julr/tenace@${version}",
+      "tagName": "v${version}",
+      "tagAnnotation": "v${version}",
+      "push": true
+    },
+    "github": {
+      "release": true
+    },
+    "npm": {
+      "publish": true,
+      "skipChecks": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": {
+          "name": "angular"
+        },
+        "path": "."
+      }
+    }
+  }
+}

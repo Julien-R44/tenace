@@ -1,0 +1,162 @@
+---
+const groups = [
+  {
+    label: 'Failure',
+    items: [
+      ['withTimeout', 'Give up after a deadline.', '/strategies/timeout/'],
+      ['withRetry', 'Try again, with backoff and jitter.', '/strategies/retry/'],
+      ['withCircuitBreaker', 'Stop calling what keeps failing.', '/strategies/circuit-breaker/'],
+      ['withFallback', 'Answer something anyway.', '/strategies/fallback/'],
+      ['withStaleFallback', 'Serve the last good value.', '/strategies/stale-fallback/'],
+    ],
+  },
+  {
+    label: 'Concurrency',
+    items: [
+      ['withBulkhead', 'Cap the calls running at once.', '/strategies/bulkhead/'],
+      ['withRateLimit', 'Limit the call rate per key.', '/strategies/rate-limit/'],
+      ['withLock', 'One holder per key, local or distributed.', '/strategies/lock/'],
+      ['withDedupe', 'Share one in-flight call.', '/strategies/dedupe/'],
+      ['withCache', 'Serve successes from a cache.', '/strategies/cache/'],
+      ['Tenace.map', 'Batches with bounded concurrency.', '/guides/batches/'],
+    ],
+  },
+  {
+    label: 'Types',
+    items: [
+      ['execute()', 'Resolve or reject, like any call.', '/concepts/execute-and-settle/'],
+      ['settle()', 'Resolve with a Result instead.', '/concepts/execute-and-settle/'],
+      ['match()', 'One handler per error, checked.', '/concepts/typed-errors/'],
+      ['ErrorOf<P>', 'The error channel of a policy.', '/concepts/typed-errors/'],
+    ],
+  },
+  {
+    label: 'Test & observe',
+    items: [
+      ['withChaos', 'Inject latency and faults.', '/strategies/chaos/'],
+      ['Tenace.chaos', 'Chaos around every policy.', '/strategies/chaos/'],
+      ['TestClock', 'Move time only when you say.', '/guides/testing/'],
+      ['OpenTelemetry', 'Spans and metrics per call.', '/observability/opentelemetry/'],
+      ['listener()', 'Every event, to your logger.', '/observability/instrumentation/'],
+    ],
+  },
+]
+---
+
+<section class="block not-content">
+    <div class="head">
+      <p class="label">The toolbox</p>
+      <h2>Everything a call to a flaky dependency needs.</h2>
+    </div>
+    <div class="groups">
+      {
+        groups.map(group => (
+          <div class="group">
+            <p class="group-label">{group.label}</p>
+            <ul>
+              {group.items.map(([name, text, href]) => (
+                <li>
+                  <a href={href}>
+                    <code>{name}</code>
+                    <span>{text}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+<style>
+  .block {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--tn-hairline);
+  }
+
+  .head {
+    margin-bottom: 2.25rem;
+  }
+  .label {
+    margin: 0 0 0.75rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tn-accent);
+  }
+  h2 {
+    margin: 0;
+    max-width: 28rem;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    color: var(--sl-color-white);
+  }
+  .group-label {
+    margin: 0 0 0.75rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .groups {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--tn-hairline);
+  }
+  .group {
+    padding: 1.25rem 1.25rem 0 0;
+  }
+  .group + .group {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--tn-hairline);
+  }
+  .group-label {
+    color: var(--sl-color-gray-3);
+  }
+  .group ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .group a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-block: 0.5rem;
+    text-decoration: none;
+  }
+  .group code {
+    padding: 0;
+    background: none;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.8125rem;
+    color: var(--sl-color-white);
+    transition: color 150ms ease-out;
+  }
+  .group a:hover code {
+    color: var(--tn-accent);
+  }
+  .group span {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--sl-color-gray-3);
+  }
+
+
+  @media (max-width: 60rem) {
+    .groups {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .group:nth-child(3) {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .group:nth-child(n + 3) {
+      border-top: 1px solid var(--tn-hairline);
+    }
+  }
+</style>

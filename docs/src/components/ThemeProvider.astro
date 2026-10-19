@@ -1,0 +1,11 @@
+---
+/**
+ * The site has a single dark theme: always set `data-theme="dark"`, and keep the global that
+ * Starlight scripts call.
+ */
+---
+
+<script is:inline>
+  document.documentElement.dataset.theme = 'dark'
+  window.StarlightThemeProvider = { updatePickers() {} }
+</script>

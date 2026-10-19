@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "isolatedDeclarations": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [".snippets/**/*.ts", "snippets.d.ts", "scripts"]
+}

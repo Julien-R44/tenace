@@ -1,0 +1,37 @@
+{
+  "name": "@julr/tenace-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "node scripts/extract_snippets.ts && tsc -p tsconfig.snippets.json",
+    "typecheck:ts5": "node scripts/extract_snippets.ts && node ./node_modules/typescript-5/bin/tsc -p tsconfig.snippets.json"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "catalog:",
+    "@fontsource-variable/geist": "catalog:",
+    "@fontsource-variable/geist-mono": "catalog:",
+    "astro": "catalog:"
+  },
+  "devDependencies": {
+    "@fontsource/geist": "catalog:",
+    "@fontsource/geist-mono": "catalog:",
+    "@julr/tenace": "workspace:^",
+    "@julr/tenace-otel": "workspace:^",
+    "@opentelemetry/api": "catalog:",
+    "@resvg/resvg-js": "catalog:",
+    "@types/node": "catalog:",
+    "@verrou/core": "catalog:",
+    "bentocache": "catalog:",
+    "rate-limiter-flexible": "catalog:",
+    "satori": "catalog:",
+    "typescript": "catalog:",
+    "typescript-5": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

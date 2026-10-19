@@ -1,0 +1,9 @@
+---
+import Default from '@astrojs/starlight/components/Header.astro'
+import LandingHeader from './landing/Header.astro'
+
+// The landing page has its own header, the docs keep the Starlight one with its sidebar menu
+const isLanding = Boolean(Astro.locals.starlightRoute.entry.data.hero)
+---
+
+{isLanding ? <LandingHeader /> : <Default />}

@@ -1,0 +1,167 @@
+---
+import { Code } from '@astrojs/starlight/components'
+import * as snippets from './snippets'
+
+const cards = [
+  {
+    label: 'Failure',
+    title: 'Stack strategies in the order they run.',
+    text: 'Each call wraps the steps added before it. The timeout bounds one attempt, the retry repeats it, the breaker stops calling a dead service, and the fallback answers.',
+    href: '/concepts/strategy-order/',
+    code: snippets.failure,
+    wide: true,
+  },
+  {
+    label: 'Concurrency',
+    title: 'Control how many calls run, and how often.',
+    text: 'Bulkheads cap parallel work, rate limits cap throughput per key, Tenace.map runs batches with a limit.',
+    href: '/strategies/bulkhead/',
+    code: snippets.concurrency,
+  },
+  {
+    label: 'Typed errors',
+    title: 'The compiler knows every error.',
+    text: 'match() needs one handler per error, so a new strategy fails the build until you handle it.',
+    href: '/concepts/typed-errors/',
+    code: snippets.typed,
+  },
+  {
+    label: 'Chaos',
+    title: 'Break it before production does.',
+    text: 'Inject latency, throws, or typed errors into a share of calls, in one policy or all of them.',
+    href: '/strategies/chaos/',
+    code: snippets.chaos,
+  },
+  {
+    label: 'Testing',
+    title: 'Test retries without waiting.',
+    text: 'TestClock moves time only when the test says so. Three timeouts and two delays run instantly.',
+    href: '/guides/testing/',
+    code: snippets.testing,
+  },
+]
+---
+
+<section class="bento">
+  <div class="head not-content">
+    <p class="label">What it does</p>
+    <h2>Five jobs, one chain.</h2>
+  </div>
+  <div class="grid">
+    {
+      cards.map(card => (
+        <article class:list={['card', { wide: card.wide }]}>
+          <div class="card-text not-content">
+            <p class="label">{card.label}</p>
+            <h3>{card.title}</h3>
+            <p>{card.text}</p>
+            <a href={card.href}>
+              Read more <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <Code code={card.code} lang="ts" />
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+
+<style>
+  .bento {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--tn-hairline);
+  }
+
+  .head {
+    margin-bottom: 2rem;
+  }
+  .label {
+    margin: 0 0 0.75rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tn-accent);
+  }
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    color: var(--sl-color-white);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .card {
+    --ec-codeFontSize: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    border: 1px solid var(--tn-hairline);
+    border-radius: 0.75rem;
+    background: var(--tn-surface);
+  }
+  .card.wide {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 2.5rem;
+    align-items: center;
+  }
+  .card > :global(*) {
+    min-width: 0;
+  }
+  .card :global(.expressive-code) {
+    margin: 0;
+    margin-top: auto;
+  }
+  .card .label {
+    color: var(--sl-color-gray-3);
+  }
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--sl-color-white);
+  }
+  .card-text p:not(.label) {
+    margin: 0.5rem 0 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+  }
+  .card-text a {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .card-text a span {
+    display: inline-block;
+    transition: transform 150ms ease-out;
+  }
+  .card-text a:hover span {
+    transform: translateX(2px);
+  }
+
+
+  @media (max-width: 60rem) {
+    .grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .card.wide {
+      display: flex;
+      gap: 1.25rem;
+      align-items: stretch;
+    }
+  }
+</style>

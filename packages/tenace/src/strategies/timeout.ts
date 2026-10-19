@@ -1,0 +1,72 @@
+import type { ExecutionContext } from '../context.ts'
+import { type Duration, toMs } from '../duration.ts'
+import { TimeoutError } from '../errors.ts'
+import { raceSignal } from '../internal/race_signal.ts'
+import { reportError } from '../internal/report_error.ts'
+import { linkSignal } from '../internal/signal.ts'
+import { type AnyResult, err } from '../result.ts'
+import { type Next, Strategy } from '../strategy.ts'
+
+export interface TimeoutOptions {
+  /**
+   * - `aggressive` (default): returns `TimeoutError` at the deadline and aborts the signal,
+   *   even if the function ignores it (its work keeps running in the background). Also stops
+   *   waiting as soon as the caller aborts. A defect of that work (a throwing callback) is
+   *   reported with `globalThis.reportError`, or as an uncaught error when the runtime has
+   *   none.
+   * - `cooperative`: aborts the signal at the deadline, then waits for the function to
+   *   settle. A failure after the deadline becomes `TimeoutError`, a success is kept.
+   */
+  readonly mode?: 'aggressive' | 'cooperative'
+}
+
+/**
+ * Bounds the time spent in the inner steps. The inner signal is aborted with the
+ * `TimeoutError` as reason. Inside a retry it bounds each attempt, outside it bounds the total.
+ */
+export class Timeout extends Strategy<TimeoutError> {
+  readonly name = 'timeout'
+  readonly timeoutMs: number
+  readonly mode: 'aggressive' | 'cooperative'
+
+  constructor(duration: Duration, options: TimeoutOptions = {}) {
+    super()
+    this.timeoutMs = toMs(duration)
+    this.mode = options.mode ?? 'aggressive'
+  }
+
+  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+    if (this.timeoutMs === Number.POSITIVE_INFINITY) return next(context)
+
+    const link = linkSignal(context.signal)
+    const error = new TimeoutError(this.timeoutMs)
+    let timedOut = false
+    let onDeadline: ((result: AnyResult) => void) | undefined
+    const deadline = new Promise<AnyResult>(resolve => (onDeadline = resolve))
+
+    const handle = context.clock.setTimeout(() => {
+      timedOut = true
+      link.abort(error)
+      onDeadline!(err(error))
+    }, this.timeoutMs)
+
+    try {
+      const inner = next(context.with({ signal: link.signal }))
+      let result: AnyResult
+      if (this.mode === 'aggressive') {
+        result = await raceSignal(Promise.race([inner, deadline]), context.signal)
+        // a defect after the race was decided can no longer reject the execution
+        void inner.catch(reportError)
+      } else {
+        result = await inner
+      }
+      if (!timedOut || result.ok) return result
+
+      context.emit({ type: 'timeout', attempt: context.attempt, timeoutMs: this.timeoutMs })
+      return err(error)
+    } finally {
+      context.clock.clearTimeout(handle)
+      link.dispose()
+    }
+  }
+}

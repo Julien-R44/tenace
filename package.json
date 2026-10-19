@@ -1,0 +1,37 @@
+{
+  "name": "tenace-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter './packages/*' build",
+    "test": "pnpm -r test",
+    "test:bun": "pnpm -r test:bun",
+    "test:workerd": "pnpm --filter @julr/tenace build && node scripts/workerd_smoke.ts",
+    "typecheck": "tsc -p tsconfig.json && pnpm -r typecheck",
+    "typecheck:ts5": "node node_modules/typescript-5/bin/tsc -p tsconfig.json && pnpm -r typecheck:ts5",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "lint:package": "pnpm build && pnpm --filter './packages/*' --parallel exec publint && pnpm --filter './packages/*' --parallel exec attw --pack . --profile esm-only",
+    "docs:dev": "pnpm --filter @julr/tenace-docs dev",
+    "docs:build": "pnpm --filter @julr/tenace-docs build",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "checks": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm typecheck:ts5 && pnpm test"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@julr/tooling-configs": "^6.1.2",
+    "@types/node": "catalog:",
+    "miniflare": "^4.20260730.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "publint": "^0.3.25",
+    "typescript": "catalog:",
+    "typescript-5": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@12.14.0"
+}

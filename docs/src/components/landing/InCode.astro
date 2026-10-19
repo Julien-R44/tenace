@@ -1,0 +1,229 @@
+---
+import { Code } from '@astrojs/starlight/components'
+import * as snippets from './snippets'
+
+const tabs = [
+  {
+    id: 'failure',
+    label: 'Failure',
+    title: 'Stack strategies in the order they run.',
+    text: 'Each call wraps the steps added before it. The timeout bounds one attempt, the retry repeats it, the breaker stops the bleeding, the fallback answers.',
+    href: '/concepts/strategy-order/',
+    code: snippets.failure,
+  },
+  {
+    id: 'concurrency',
+    label: 'Concurrency',
+    title: 'Control how many calls run, and how often.',
+    text: 'Bulkheads cap parallel work, rate limits cap throughput per key, and Tenace.map runs whole batches through a policy with a concurrency limit.',
+    href: '/strategies/bulkhead/',
+    code: snippets.concurrency,
+  },
+  {
+    id: 'typed',
+    label: 'Typed errors',
+    title: 'The compiler knows every error.',
+    text: 'Strategies add their errors to the type of the policy and fallbacks remove them. match() needs one handler per error, so a new strategy fails the build until you handle it.',
+    href: '/concepts/typed-errors/',
+    code: snippets.typed,
+  },
+  {
+    id: 'chaos',
+    label: 'Chaos',
+    title: 'Break it before production does.',
+    text: 'withChaos() injects latency, throws, or typed errors into a share of calls. Tenace.chaos() does it around every policy at once, without touching the code under test.',
+    href: '/strategies/chaos/',
+    code: snippets.chaos,
+  },
+  {
+    id: 'testing',
+    label: 'Testing',
+    title: 'Test retries without waiting for them.',
+    text: 'Timeouts, retry delays, and open circuits read the time from a clock. TestClock moves it only when the test says so.',
+    href: '/guides/testing/',
+    code: snippets.testing,
+  },
+  {
+    id: 'observe',
+    label: 'Observability',
+    title: 'See every attempt in production.',
+    text: 'One instrumentation interface sees every execution, attempt, and event. OpenTelemetry, diagnostics_channel, and your logger plug into it.',
+    href: '/observability/instrumentation/',
+    code: snippets.observe,
+  },
+]
+---
+
+  <section class="block in-code">
+    <div class="head not-content">
+      <p class="label">In code</p>
+      <h2>Small API, read in one sitting.</h2>
+    </div>
+    <div class="tabs not-content" role="tablist" aria-label="Examples">
+      {
+        tabs.map((tab, index) => (
+          <button
+            role="tab"
+            id={`tab-${tab.id}`}
+            aria-controls={`panel-${tab.id}`}
+            aria-selected={index === 0 ? 'true' : 'false'}
+            tabindex={index === 0 ? 0 : -1}
+          >
+            {tab.label}
+          </button>
+        ))
+      }
+    </div>
+    {
+      tabs.map((tab, index) => (
+        <div
+          class="panel"
+          role="tabpanel"
+          id={`panel-${tab.id}`}
+          aria-labelledby={`tab-${tab.id}`}
+          hidden={index !== 0}
+        >
+          <div class="panel-text not-content">
+            <h3>{tab.title}</h3>
+            <p>{tab.text}</p>
+            <a href={tab.href}>
+              Read more <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <Code code={tab.code} lang="ts" />
+        </div>
+      ))
+    }
+  </section>
+
+<script>
+  for (const list of document.querySelectorAll<HTMLElement>('.in-code [role="tablist"]')) {
+    const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    const select = (next: HTMLButtonElement) => {
+      for (const tab of tabs) {
+        const selected = tab === next
+        tab.setAttribute('aria-selected', String(selected))
+        tab.tabIndex = selected ? 0 : -1
+        document.getElementById(tab.getAttribute('aria-controls') ?? '')!.hidden = !selected
+      }
+    }
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => select(tab))
+      tab.addEventListener('keydown', event => {
+        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+        if (!step) return
+        event.preventDefault()
+        event.stopPropagation()
+        const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length]!
+        select(next)
+        next.focus()
+      })
+    }
+  }
+</script>
+
+<style>
+  .block {
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--tn-hairline);
+  }
+
+  .head {
+    margin-bottom: 2.25rem;
+  }
+  .label {
+    margin: 0 0 0.75rem;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tn-accent);
+  }
+  h2 {
+    margin: 0;
+    max-width: 28rem;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    color: var(--sl-color-white);
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--tn-hairline);
+  }
+  .tabs button {
+    height: 1.875rem;
+    padding: 0 0.75rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: none;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+    transition:
+      color 150ms ease-out,
+      background-color 150ms ease-out;
+  }
+  .tabs button:hover {
+    color: var(--sl-color-white);
+  }
+  .tabs button[aria-selected='true'] {
+    border-color: var(--tn-hairline-strong);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--sl-color-white);
+  }
+
+  .panel {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 3rem;
+    align-items: start;
+  }
+  .panel[hidden] {
+    display: none;
+  }
+  .panel :global(.expressive-code) {
+    margin: 0;
+  }
+  h3 {
+    margin: 0.25rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--sl-color-white);
+  }
+  .panel-text p {
+    margin: 0.6rem 0 1rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+  }
+  .panel-text a {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .panel-text a span {
+    display: inline-block;
+    transition: transform 150ms ease-out;
+  }
+  .panel-text a:hover span {
+    transform: translateX(2px);
+  }
+
+
+  @media (max-width: 60rem) {
+    .panel {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.25rem;
+    }
+  }
+</style>

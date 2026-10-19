@@ -1,0 +1,135 @@
+---
+import { Code } from '@astrojs/starlight/components'
+import Actions from './landing/Actions.astro'
+import Dither from './landing/Dither.astro'
+import { quickstart } from './landing/snippets'
+
+// Starlight links to the page title with this id (PAGE_TITLE_ID, not exported)
+const PAGE_TITLE_ID = '_top'
+
+const { data } = Astro.locals.starlightRoute.entry
+const { title = data.title, tagline } = data.hero ?? {}
+---
+
+<section class="hero">
+  <div class="bg" aria-hidden="true">
+    <Dither focusX={0.5} focusY={0.3} />
+  </div>
+
+  <div class="content not-content">
+    <a class="badge" href="/reference/runtimes/">
+      <span>ESM</span> Zero dependencies · Node.js, Bun, Workers
+    </a>
+    <h1 id={PAGE_TITLE_ID} data-page-title set:html={title} />
+    {tagline && <p set:html={tagline} />}
+    <Actions center stack />
+  </div>
+</section>
+
+<div class="window">
+  <Code code={quickstart} lang="ts" title="users.ts" />
+</div>
+
+<style>
+  .hero {
+    position: relative;
+    isolation: isolate;
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    /* Under the header, over the content panel padding */
+    margin-top: calc(-1 * (var(--sl-nav-height) + 1.5rem));
+    padding: calc(var(--sl-nav-height) + 6rem) 1.5rem 11rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--tn-hairline);
+    text-align: center;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  }
+  .bg :global(.dither) {
+    opacity: 0.5;
+  }
+  /* Darken the middle so the text reads over the image */
+  .bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 38rem 18rem at 50% 45%,
+      rgb(7 8 10 / 0.92),
+      rgb(7 8 10 / 0.4) 70%,
+      transparent
+    );
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 40rem;
+    margin-inline: auto;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    padding: 0.2rem 0.6rem 0.2rem 0.2rem;
+    border: 1px solid var(--tn-hairline-strong);
+    border-radius: 999px;
+    background: rgb(8 9 10 / 0.6);
+    backdrop-filter: blur(6px);
+    font-size: 0.6875rem;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    transition: border-color 150ms ease-out;
+  }
+  .badge:hover {
+    border-color: rgb(255 255 255 / 0.28);
+  }
+  .badge span {
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2rem, 1.4rem + 2.2vw, 3rem);
+    line-height: 1.05;
+    font-weight: 500;
+    letter-spacing: -0.04em;
+    color: var(--sl-color-white);
+  }
+  p {
+    max-width: 32rem;
+    margin: 1rem 0 1.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+  }
+
+  .window {
+    max-width: 44rem;
+    margin: -7.5rem auto 0;
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+  }
+  .window :global(.expressive-code) {
+    margin: 0;
+  }
+
+  @media (max-width: 50rem) {
+    .hero {
+      padding-top: calc(var(--sl-nav-height) + 3.5rem);
+    }
+  }
+</style>

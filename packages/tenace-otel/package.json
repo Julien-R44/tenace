@@ -1,0 +1,64 @@
+{
+  "name": "@julr/tenace-otel",
+  "version": "2.0.0-next.0",
+  "description": "OpenTelemetry instrumentation for @julr/tenace: spans per execution and attempt, events and metrics",
+  "keywords": [
+    "opentelemetry",
+    "otel",
+    "resilience",
+    "tenace",
+    "tracing"
+  ],
+  "license": "MIT",
+  "author": "Julien Ripouteau <julien@ripouteau.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/julien-r44/tenace.git",
+    "directory": "packages/tenace-otel"
+  },
+  "files": [
+    "build"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "tenace-source": "./src/index.ts",
+      "default": "./build/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "typecheck:ts5": "node ./node_modules/typescript-5/bin/tsc --noEmit",
+    "test": "node --conditions=tenace-source --import=@poppinss/ts-exec --enable-source-maps bin/test.ts",
+    "test:bun": "bun --conditions=tenace-source bin/test.ts",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "@japa/assert": "catalog:",
+    "@japa/runner": "catalog:",
+    "@julr/tenace": "workspace:^",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@poppinss/ts-exec": "catalog:",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "typescript-5": "catalog:"
+  },
+  "peerDependencies": {
+    "@julr/tenace": "workspace:^",
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

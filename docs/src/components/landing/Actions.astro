@@ -1,0 +1,120 @@
+---
+interface Props {
+  center?: boolean
+  // Puts the install command on its own line
+  stack?: boolean
+}
+
+const { center = false, stack = false } = Astro.props
+const install = 'pnpm add @julr/tenace'
+---
+
+<div class:list={['actions', { center, stack }]}>
+  <a class="btn btn-solid" href="/getting-started/">Get started</a>
+  <a class="btn btn-ghost" href="https://github.com/julien-r44/tenace">GitHub</a>
+  <button class="install" type="button" data-copy={install} aria-label="Copy the install command">
+    <span class="prompt" aria-hidden="true">$</span>
+    <code>{install}</code>
+    <span class="state" aria-hidden="true">copy</span>
+  </button>
+</div>
+
+<script>
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-copy]')) {
+    button.addEventListener('click', () => {
+      const state = button.querySelector('.state')
+      void navigator.clipboard.writeText(button.dataset['copy'] ?? '').then(() => {
+        if (!state) return
+        state.textContent = 'copied'
+        setTimeout(() => (state.textContent = 'copy'), 1500)
+      })
+    })
+  }
+</script>
+
+<style>
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .actions.center {
+    justify-content: center;
+  }
+  .actions.stack::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+  }
+  .actions.stack .install {
+    order: 2;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    height: 2.125rem;
+    padding: 0 0.875rem;
+    border-radius: 0.4375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out;
+  }
+  .btn-solid {
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
+  }
+  .btn-solid:hover {
+    background: #d4d4d8;
+    color: var(--sl-color-black);
+  }
+  .btn-ghost {
+    border: 1px solid var(--tn-hairline-strong);
+    background: rgb(8 9 10 / 0.5);
+    color: var(--sl-color-white);
+  }
+  .btn-ghost:hover {
+    border-color: rgb(255 255 255 / 0.28);
+    color: var(--sl-color-white);
+  }
+  .install {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 2.125rem;
+    padding: 0 0.4rem 0 0.75rem;
+    border: 1px solid var(--tn-hairline);
+    border-radius: 0.4375rem;
+    background: rgb(8 9 10 / 0.5);
+    backdrop-filter: blur(6px);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 150ms ease-out;
+  }
+  .install:hover {
+    border-color: var(--tn-hairline-strong);
+  }
+  .install code {
+    padding: 0;
+    background: none;
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--sl-color-white);
+  }
+  .prompt {
+    font-family: var(--__sl-font-mono);
+    font-size: 0.75rem;
+    color: var(--sl-color-gray-4);
+  }
+  .state {
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+    background: rgb(255 255 255 / 0.06);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.625rem;
+    color: var(--sl-color-gray-3);
+  }
+</style>
