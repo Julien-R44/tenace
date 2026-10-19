@@ -61,6 +61,13 @@ test.group('ExecutionContext', () => {
     await policy.execute(() => 1, { signal: new AbortController().signal })
     await Tenace.map([1], () => 1, { policy }).execute()
 
+    const root = new ExecutionContext({ signal: new AbortController().signal, abortable: false })
+    assert.isFalse(root.with({ attempt: 2, signal: root.signal }).abortable)
+    // a context spread into a new one with another signal is abortable again
+    const other = new AbortController().signal
+    // oxlint-disable-next-line typescript/no-misused-spread
+    assert.isTrue(new ExecutionContext({ ...root, signal: other }).abortable)
+
     assert.deepEqual(seen, [
       ['root', false],
       ['inside timeout', true],

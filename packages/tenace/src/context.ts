@@ -23,6 +23,9 @@ export interface ExecutionContextInit {
   readonly scope?: ExecutionScope
   readonly key?: string | undefined
   readonly idempotent?: boolean
+  /**
+   * `false` when nothing can abort `signal`. Defaults to `true`.
+   */
   readonly abortable?: boolean
 }
 
@@ -49,10 +52,10 @@ export class ExecutionContext implements Context {
    */
   readonly idempotent: boolean
   /**
-   * `false` when nothing can abort `signal` (no caller signal, no timeout or batch around),
-   * so strategies can skip listening to it. Defaults to `true`.
+   * The signal nothing can abort, if any. Private, so a context spread into a new one with
+   * another signal does not carry it.
    */
-  readonly abortable: boolean
+  readonly #idleSignal: AbortSignal | undefined
 
   constructor(init: ExecutionContextInit) {
     this.signal = init.signal
@@ -61,8 +64,16 @@ export class ExecutionContext implements Context {
     this.scope = init.scope ?? noopScope
     this.key = init.key
     this.idempotent = init.idempotent ?? true
-    this.abortable = init.abortable ?? true
+    this.#idleSignal = init.abortable === false ? init.signal : undefined
     Object.freeze(this)
+  }
+
+  /**
+   * `false` when nothing can abort `signal` (no caller signal, no timeout or batch around),
+   * so strategies can skip listening to it.
+   */
+  get abortable(): boolean {
+    return this.signal !== this.#idleSignal
   }
 
   /**
@@ -80,15 +91,16 @@ export class ExecutionContext implements Context {
   }
 
   with(patch: Partial<ExecutionContextInit>): ExecutionContext {
+    const signal = patch.signal ?? this.signal
     return new ExecutionContext({
-      signal: patch.signal ?? this.signal,
+      signal,
       attempt: patch.attempt ?? this.attempt,
       clock: patch.clock ?? this.clock,
       scope: patch.scope ?? this.scope,
       key: 'key' in patch ? patch.key : this.key,
       idempotent: patch.idempotent ?? this.idempotent,
-      // a new signal comes from something that can abort it (a timeout, a batch)
-      abortable: patch.abortable ?? (patch.signal ? true : this.abortable),
+      // another signal comes from something that can abort it (a timeout, a batch)
+      abortable: patch.abortable ?? signal !== this.#idleSignal,
     })
   }
 }
