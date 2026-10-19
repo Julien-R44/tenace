@@ -14,6 +14,7 @@ export default defineConfig({
   target: 'es2022',
   fixedExtension: false,
   dts: true,
+  unbundle: true,
   clean: true,
   treeshake: false,
   sourcemap: false,
