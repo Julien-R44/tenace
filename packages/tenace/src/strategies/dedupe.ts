@@ -75,18 +75,12 @@ export class Dedupe extends Strategy {
         shared.controller.abort(context.signal.reason)
       }
     }
-    if (!context.abortable) {
-      try {
-        return await shared.promise
-      } finally {
-        leave()
-      }
-    }
-    context.signal.addEventListener('abort', leave, { once: true })
+    const { abortable, signal } = context
+    if (abortable) signal.addEventListener('abort', leave, { once: true })
     try {
-      return await raceSignal(shared.promise, context.signal)
+      return await (abortable ? raceSignal(shared.promise, signal) : shared.promise)
     } finally {
-      context.signal.removeEventListener('abort', leave)
+      if (abortable) signal.removeEventListener('abort', leave)
       leave()
     }
   }
