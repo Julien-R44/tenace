@@ -1,0 +1,160 @@
+---
+// A geometric composition drawn in a canvas, or a grayscale image, dithered like the hero image
+interface Props {
+  kind?: 'rings' | 'grid'
+  src?: string
+}
+
+const { kind, src } = Astro.props
+---
+
+<canvas class="shape" data-kind={kind} data-src={src} aria-hidden="true"></canvas>
+
+<script>
+  const BAYER = [
+    0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28,
+    52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39,
+    13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21,
+  ].map(value => (value + 0.5) * 4)
+
+  // One canvas pixel per CSS pixel, as fine as the hero
+  const CELL = 1
+
+  type Draw = (context: CanvasRenderingContext2D, width: number, height: number) => void
+
+  // Each step wraps the one before it, like the strategies in a policy
+  const rings: Draw = (context, width, height) => {
+    const x = width * 0.72
+    const y = height * 0.62
+    const unit = height * 0.16
+    const glow = context.createRadialGradient(x, y, 0, x, y, height * 1.1)
+    glow.addColorStop(0, 'rgb(150 150 150)')
+    glow.addColorStop(1, 'rgb(0 0 0)')
+    context.fillStyle = glow
+    context.fillRect(0, 0, width, height)
+    const count = 6
+    for (let index = count; index >= 1; index--) {
+      const radius = unit * index
+      const shade = 255 - index * 30
+      context.beginPath()
+      context.arc(x, y, radius, 0, Math.PI * 2)
+      context.lineWidth = Math.max(2, height * 0.035)
+      context.strokeStyle = `rgb(${shade} ${shade} ${shade})`
+      context.stroke()
+    }
+    context.beginPath()
+    context.arc(x, y, height * 0.09, 0, Math.PI * 2)
+    context.fillStyle = 'rgb(255 255 255)'
+    context.fill()
+  }
+
+  // A calm grid where a few cells are knocked out of place
+  const grid: Draw = (context, width, height) => {
+    context.fillStyle = 'rgb(0 0 0)'
+    context.fillRect(0, 0, width, height)
+    const size = Math.round(height / 5)
+    const gap = Math.max(2, Math.round(size * 0.18))
+    const columns = Math.ceil(width / size)
+    const rows = Math.ceil(height / size)
+    let seed = 7
+    const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        // Fades in from the left, where the card text sits
+        const fade = Math.min(1, Math.max(0, (column / columns - 0.25) * 1.6))
+        const hit = random() < 0.09
+        const dx = hit ? (random() - 0.5) * size * 0.8 : 0
+        const dy = hit ? (random() - 0.5) * size * 0.8 : 0
+        const shade = Math.round((hit ? 255 : 70 + random() * 40) * fade)
+        context.fillStyle = `rgb(${shade} ${shade} ${shade})`
+        context.fillRect(column * size + dx, row * size + dy, size - gap, size - gap)
+      }
+    }
+  }
+
+  // Draws an image like object-fit: cover
+  const cover =
+    (image: HTMLImageElement): Draw =>
+    (context, width, height) => {
+      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight)
+      const drawWidth = image.naturalWidth * scale
+      const drawHeight = image.naturalHeight * scale
+      context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight)
+    }
+
+  const drawings: Record<string, Draw> = { rings, grid }
+
+  function paint(canvas: HTMLCanvasElement, draw: Draw) {
+    const width = Math.round(canvas.clientWidth / CELL)
+    const height = Math.round(canvas.clientHeight / CELL)
+    if (width === 0 || height === 0) return
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) return
+    draw(context, width, height)
+    const pixels = context.getImageData(0, 0, width, height)
+
+    const tint = context.createRadialGradient(
+      width * 0.7,
+      height * 0.2,
+      0,
+      width * 0.7,
+      height * 0.2,
+      Math.max(width, height) * 0.8,
+    )
+    const styles = getComputedStyle(canvas)
+    tint.addColorStop(0, '#f4f4f5')
+    tint.addColorStop(0.55, styles.getPropertyValue('--tn-accent').trim() || '#8b8cff')
+    tint.addColorStop(1, styles.getPropertyValue('--tn-accent-2').trim() || '#6ee7f9')
+    context.fillStyle = tint
+    context.fillRect(0, 0, width, height)
+    const colors = context.getImageData(0, 0, width, height).data
+
+    const data = pixels.data
+    for (let y = 0; y < height; y++) {
+      const row = (y & 7) * 8
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4
+        const on = data[index]! > BAYER[row + (x & 7)]!
+        data[index] = colors[index]!
+        data[index + 1] = colors[index + 1]!
+        data[index + 2] = colors[index + 2]!
+        data[index + 3] = on ? 255 : 0
+      }
+    }
+    context.putImageData(pixels, 0, 0)
+  }
+
+  function observe(canvas: HTMLCanvasElement, draw: Draw) {
+    let lastWidth = 0
+    let frame = 0
+    new ResizeObserver(() => {
+      if (canvas.clientWidth === lastWidth) return
+      lastWidth = canvas.clientWidth
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => paint(canvas, draw))
+    }).observe(canvas)
+  }
+
+  for (const canvas of document.querySelectorAll<HTMLCanvasElement>('canvas.shape')) {
+    const { kind, src } = canvas.dataset
+    if (src) {
+      const image = new Image()
+      image.src = src
+      void image.decode().then(() => observe(canvas, cover(image)))
+    } else if (kind && drawings[kind]) {
+      observe(canvas, drawings[kind])
+    }
+  }
+</script>
+
+<style>
+  .shape {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+</style>

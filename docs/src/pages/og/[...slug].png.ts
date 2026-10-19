@@ -50,7 +50,9 @@ export const getStaticPaths = (async () => {
 export const GET: APIRoute<{ entry: CollectionEntry<'docs'> }> = async ({ props }) => {
   const { entry } = props
   const isLanding = entry.id === 'index'
-  const title = isLanding ? 'Resilience policies with typed errors.' : entry.data.title
+  // The landing headline keeps the line break of the hero
+  const lines = isLanding ? (entry.data.hero?.title ?? '').split('<br />') : [entry.data.title]
+  const title = lines.join(' ')
   const description = isLanding ? entry.data.hero?.tagline : entry.data.description
   const section = isLanding ? 'Docs' : (SECTIONS[entry.id.split('/')[0]!] ?? 'Docs')
 
@@ -114,12 +116,14 @@ export const GET: APIRoute<{ entry: CollectionEntry<'docs'> }> = async ({ props 
           h(
             'div',
             {
+              display: 'flex',
+              flexDirection: 'column',
               fontSize: title.length > 28 ? 68 : 80,
               fontWeight: 600,
               lineHeight: 1.04,
               letterSpacing: '-0.04em',
             },
-            title,
+            ...lines.map(line => h('div', {}, line)),
           ),
           description
             ? h(
