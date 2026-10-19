@@ -1,10 +1,12 @@
 import { type Clock, systemClock } from '../../clock.ts'
 import type { ExecutionContext } from '../../context.ts'
 import { type Duration, toMs } from '../../duration.ts'
-import { CircuitOpenError } from '../../errors.ts'
+import { CircuitOpenError, UnexpectedError } from '../../errors.ts'
+import { reportError } from '../../internal/report_error.ts'
+import type { MaybePromise } from '../../internal/types.ts'
 import { type AnyResult, err } from '../../result.ts'
 import { type Next, Strategy } from '../../strategy.ts'
-import type { BreakerConfig, CallOutcome, CircuitState, TripConfig } from './machine.ts'
+import type { Admission, BreakerConfig, CallOutcome, CircuitState, TripConfig } from './machine.ts'
 import { type CircuitBreakerStore, MemoryCircuitBreakerStore } from './store.ts'
 
 /**
@@ -65,7 +67,8 @@ export interface CircuitBreakerOptions {
    */
   readonly classify?: (result: AnyResult) => CallOutcome
   /**
-   * Called after each state change.
+   * Called after each state change. An error it throws is reported with
+   * `globalThis.reportError` and does not change the result of the call.
    */
   readonly onStateChange?: (event: {
     readonly from: CircuitState
@@ -176,9 +179,14 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
   readonly #classify: (result: AnyResult) => CallOutcome
   readonly #onStateChange: CircuitBreakerOptions['onStateChange']
   /**
-   * Last state reported, `undefined` once a call nobody observed may have changed it.
+   * Last state a tracked call saw. See `#notify`.
    */
-  #lastState: CircuitState | undefined = 'closed'
+  #lastState: CircuitState = 'closed'
+  /**
+   * Sequence numbers of the last state read started and of the last one applied.
+   */
+  #reads = 0
+  #appliedRead = 0
 
   constructor(options: CircuitBreakerOptions = {}) {
     super()
@@ -217,7 +225,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
    */
   get state(): CircuitState {
     const state = this.#store.state(this.#clock.now(), this.config)
-    if (state instanceof Promise) {
+    if (isThenable(state)) {
       throw new TypeError('This store is asynchronous, use `await breaker.getState()`')
     }
     return state
@@ -244,13 +252,16 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
   }
 
   async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
-    if (this.#lastState === undefined && this.#tracks(context)) {
-      this.#lastState = await this.#store.state(this.#clock.now(), this.config)
+    let admission: Admission
+    try {
+      const admitted = this.#store.admit(this.#clock.now(), this.config)
+      // the memory store is synchronous: awaiting its values costs microtask hops on every call
+      admission = isThenable(admitted) ? await admitted : admitted
+    } catch (error) {
+      return err(new UnexpectedError(error))
     }
-    const admitted = this.#store.admit(this.#clock.now(), this.config)
-    // the memory store is synchronous: awaiting its values costs microtask hops on every call
-    const admission = isThenable(admitted) ? await admitted : admitted
-    if (this.#tracks(context)) await this.#notify(context)
+    const notified = this.#notify(context)
+    if (notified) await notified
     if (!admission.admitted) {
       const { state, retryAfterMs } = admission
       context.emit({ type: 'circuit.rejected', breaker: this.name, state, retryAfterMs })
@@ -263,9 +274,20 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
       if (!context.signal.aborted) outcome = this.#classify(result)
       return result
     } finally {
-      const recorded = this.#store.record(admission.ticket, outcome, this.#clock.now(), this.config)
-      if (isThenable(recorded)) await recorded
-      if (this.#tracks(context)) await this.#notify(context)
+      try {
+        const recorded = this.#store.record(
+          admission.ticket,
+          outcome,
+          this.#clock.now(),
+          this.config,
+        )
+        if (isThenable(recorded)) await recorded
+      } catch (error) {
+        // the call ran: a store that cannot record it must not change its result
+        reportError(error)
+      }
+      const notified = this.#notify(context)
+      if (notified) await notified
     }
   }
 
@@ -275,15 +297,38 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
 
   /**
    * Reports a change from the last state a tracked call saw. Untracked calls leave it as is,
-   * so a change they caused is reported by the next tracked call, never lost.
+   * so a change they caused is reported by the next tracked call, never lost. A failing
+   * read is reported and changes nothing. Nothing to await with a synchronous store.
    */
-  async #notify(context?: ExecutionContext): Promise<void> {
+  #notify(context?: ExecutionContext): Promise<void> | undefined {
     if (!this.#tracks(context)) return
-    const state = await this.#store.state(this.#clock.now(), this.config)
+    const read = ++this.#reads
+    let state: MaybePromise<CircuitState>
+    try {
+      state = this.#store.state(this.#clock.now(), this.config)
+    } catch (error) {
+      reportError(error)
+      return
+    }
+    if (!isThenable(state)) return this.#apply(read, state, context)
+    return Promise.resolve(state).then(value => this.#apply(read, value, context), reportError)
+  }
+
+  /**
+   * Asynchronous reads complete in any order: one older than the last applied is stale.
+   */
+  #apply(read: number, state: CircuitState, context: ExecutionContext | undefined): undefined {
+    if (read < this.#appliedRead) return
+    this.#appliedRead = read
     const from = this.#lastState
     this.#lastState = state
-    if (from === undefined || from === state) return
+    if (from === state) return
     context?.emit({ type: 'circuit.state_changed', breaker: this.name, from, to: state })
-    this.#onStateChange?.({ from, to: state })
+    try {
+      this.#onStateChange?.({ from, to: state })
+    } catch (error) {
+      // an observer of a shared circuit: its bug must not change the result of the call
+      reportError(error)
+    }
   }
 }

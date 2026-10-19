@@ -39,7 +39,7 @@ export interface LockProvider {
 }
 
 /**
- * In-process locks (one holder per key, FIFO).
+ * In-process locks (one holder per key, FIFO). Releasing a lease twice releases once.
  */
 export class MemoryLockProvider implements LockProvider {
   readonly #locks = new Map<string, Scheduler>()
@@ -63,15 +63,23 @@ export class MemoryLockProvider implements LockProvider {
       this.#forgetIdle(key, scheduler)
       return undefined
     }
+    let released = false
     return {
       release: () => {
+        if (released) return
+        released = true
         release()
         this.#forgetIdle(key, scheduler)
       },
     }
   }
 
+  /**
+   * Only forgets the key while it still maps to this scheduler: a late call (an aborted
+   * waiter resuming) must not drop a newer scheduler that has a holder.
+   */
   #forgetIdle(key: string, scheduler: Scheduler): void {
+    if (this.#locks.get(key) !== scheduler) return
     if (scheduler.running === 0 && scheduler.queued === 0) this.#locks.delete(key)
   }
 }

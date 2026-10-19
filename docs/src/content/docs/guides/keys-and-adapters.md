@@ -52,7 +52,7 @@ const policy = Tenace.policy().withRateLimit({ store: rateLimiterFlexible(limite
 await policy.execute(() => getUser(id), { key: `user:${id}` })
 ```
 
-Each call consumes one point. A rejection of the limiter becomes a `RateLimitError` with its `msBeforeNext` as `retryAfterMs`. An `Error` from the limiter, such as a lost Redis connection, fails the call with an `UnexpectedError`.
+Each call consumes one point. A rejection of the limiter becomes a `RateLimitError` with its `msBeforeNext` as `retryAfterMs`, or `Infinity` when the limit never resets (`duration: 0`). An `Error` from the limiter, such as a lost Redis connection, fails the call with an `UnexpectedError`.
 
 ### Verrou
 

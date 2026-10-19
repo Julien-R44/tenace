@@ -123,7 +123,10 @@ function eventAttributes(event: TenaceEvent): Attributes {
     case 'fallback.stale':
       return { 'tenace.key': event.key, 'tenace.stale.age_ms': event.ageMs }
     case 'rate_limit.rejected':
-      return { 'tenace.key': event.key, 'tenace.retry_after_ms': event.retryAfterMs }
+      return {
+        'tenace.key': event.key,
+        ...(event.retryAfterMs !== undefined && { 'tenace.retry_after_ms': event.retryAfterMs }),
+      }
     case 'lock.rejected':
     case 'dedupe.joined':
     case 'cache.hit':

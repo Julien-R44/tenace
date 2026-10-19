@@ -37,7 +37,7 @@ Share the `RateLimit` instance, or the store, to share the limit between policie
 
 The default store, `MemoryRateLimitStore`, is a token bucket per key. A bucket holds up to `limit` tokens and refills continuously at `limit` tokens per `per`. A call takes one token. Bursts of up to `limit` calls pass at once. A key unused for `per`, whose bucket is full again, is forgotten, so the memory stays bounded. `store.size` returns the number of keys tracked.
 
-When no token is left, the store says when the next one arrives. If that wait fits in `maxWait`, the call waits, then asks again. Otherwise it fails with `RateLimitError`. A wait stops when the signal aborts, and the call fails like any aborted call, not with a `RateLimitError`.
+When no token is left, the store says when the next one arrives. If that wait fits in `maxWait`, the call waits, then asks again. Otherwise it fails with `RateLimitError`. A denial with a wait that is not a positive number, such as `0` or `NaN`, fails right away, even with `maxWait`. A wait stops when the signal aborts, and the call fails like any aborted call, not with a `RateLimitError`.
 
 A retry outside the rate limit waits at least `retryAfterMs` before the next attempt. See [Retry-After](/strategies/retry/#retry-after).
 
@@ -46,7 +46,7 @@ A retry outside the rate limit waits at least `retryAfterMs` before the next att
 Adds `RateLimitError`, with these fields:
 
 - `key`: the key that ran out of calls.
-- `retryAfterMs`: when a call may be admitted again.
+- `retryAfterMs`: when a call may be admitted again, `undefined` when the store gave no positive wait.
 
 ## Stores
 
@@ -57,7 +57,7 @@ interface RateLimitStore {
 
 interface RateLimitDecision {
   readonly allowed: boolean
-  readonly retryAfterMs: number // 0 when allowed
+  readonly retryAfterMs: number // 0 when allowed, > 0 when denied
 }
 ```
 

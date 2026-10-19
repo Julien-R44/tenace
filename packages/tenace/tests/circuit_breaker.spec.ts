@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 
 import { backoff } from '../src/backoff.ts'
-import { CircuitOpenError } from '../src/errors.ts'
+import { CircuitOpenError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
 import { err, ok } from '../src/result.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
@@ -279,6 +279,32 @@ test.group('CircuitBreaker | isolate and events', () => {
     assert.deepEqual(await policy.settle(succeed), ok('up'))
   })
 
+  test('an onStateChange that throws is reported and keeps the result of the call', async ({
+    assert,
+  }) => {
+    const bug = new Error('listener bug')
+    const reported: unknown[] = []
+    const holder = globalThis as { reportError?: (error: unknown) => void }
+    const original = holder.reportError
+    holder.reportError = error => reported.push(error)
+    try {
+      const { policy, breaker } = setup({
+        trip: { consecutive: 1 },
+        onStateChange: () => {
+          throw bug
+        },
+      })
+      const result = await policy.settle(fail)
+      assert.equal(breaker.state, 'open')
+      assert.instanceOf(!result.ok && result.error, UnexpectedError)
+      assert.equal(((result as { error: UnexpectedError }).error.cause as Error).message, 'down')
+      assert.deepEqual(reported, [bug])
+    } finally {
+      if (original) holder.reportError = original
+      else delete holder.reportError
+    }
+  })
+
   test('onStateChange reports transitions', async ({ assert }) => {
     const events: string[] = []
     const { policy, clock, breaker } = setup({
@@ -334,6 +360,57 @@ test.group('CircuitBreaker | isolate and events', () => {
     assert.deepEqual(changes, ['closed->open'])
   })
 
+  test('a slow state read never reports a transition older than the last one', async ({
+    assert,
+  }) => {
+    const memory = new MemoryCircuitBreakerStore()
+    // state reads resolve when the test says so, in any order
+    const reads: { value: CircuitState; resolve: () => void }[] = []
+    let held = true
+    const store: CircuitBreakerStore = {
+      admit: (...args) => memory.admit(...args),
+      record: (...args) => memory.record(...args),
+      isolate: (...args) => memory.isolate(...args),
+      release: (...args) => memory.release(...args),
+      state: (...args) => {
+        const value = memory.state(...args)
+        if (!held) return Promise.resolve(value)
+        return new Promise(resolve => reads.push({ value, resolve: () => resolve(value) }))
+      },
+    }
+    const read = async (index: number) => {
+      for (let i = 0; i < 100 && reads.length <= index; i++) await Promise.resolve()
+      return reads[index]!
+    }
+    const events: string[] = []
+    const { policy, clock, breaker } = setup({
+      trip: { consecutive: 1 },
+      store,
+      onStateChange: ({ from, to }) => events.push(`${from}->${to}`),
+    })
+
+    const failed = policy.settle(fail)
+    ;(await read(0)).resolve()
+    const opened = await read(1)
+    assert.equal(opened.value, 'open')
+
+    await clock.advance(1000)
+    const succeeded = policy.settle(succeed)
+    ;(await read(2)).resolve()
+    const closed = await read(3)
+    assert.equal(closed.value, 'closed')
+    closed.resolve()
+    await succeeded
+
+    // the read made when the circuit opened completes last
+    opened.resolve()
+    await failed
+    held = false
+    await policy.settle(succeed)
+    assert.equal(await breaker.getState(), 'closed')
+    assert.deepEqual(events, ['closed->half-open', 'half-open->closed'])
+  })
+
   test('an outer retry waits for the circuit to admit calls again', async ({ assert }) => {
     const { clock, breaker } = setup()
     const policy = Tenace.policy().with(breaker).withRetry({ retries: 3, delay: 10 })
@@ -383,6 +460,73 @@ test.group('CircuitBreaker | store and options', () => {
     assert.equal(await policy.execute(() => 'value'), 'value')
     await policy.settle(fail)
     assert.equal(memory.state(Date.now(), breaker.config), 'open')
+  })
+
+  test('a store failure is an UnexpectedError and never replaces the result of a call', async ({
+    assert,
+  }) => {
+    const reported: unknown[] = []
+    const holder = globalThis as { reportError?: (error: unknown) => void }
+    const original = holder.reportError
+    holder.reportError = error => reported.push(error)
+    try {
+      const down = new Error('store down')
+      const memory = new MemoryCircuitBreakerStore()
+      const failing = (failed: keyof CircuitBreakerStore): CircuitBreakerStore => ({
+        admit: (...args) => (failed === 'admit' ? Promise.reject(down) : memory.admit(...args)),
+        record: (...args) => (failed === 'record' ? Promise.reject(down) : memory.record(...args)),
+        isolate: (...args) => memory.isolate(...args),
+        release: (...args) => memory.release(...args),
+        state: (...args) => {
+          if (failed === 'state') throw down
+          return memory.state(...args)
+        },
+      })
+
+      let called = false
+      const admit = await Tenace.policy()
+        .withCircuitBreaker({ store: failing('admit') })
+        .settle(() => (called = true))
+      assert.isFalse(called)
+      assert.isTrue(
+        !admit.ok && admit.error instanceof UnexpectedError && admit.error.cause === down,
+      )
+
+      for (const failed of ['record', 'state'] as const) {
+        const policy = Tenace.policy().withCircuitBreaker({
+          store: failing(failed),
+          onStateChange: () => {},
+        })
+        assert.deepEqual(await policy.settle(succeed), ok('up'), failed)
+        assert.deepEqual(await policy.settle(() => err('nope')), err('nope'), failed)
+      }
+      await new Promise(resolve => setTimeout(resolve, 0))
+      assert.isNotEmpty(reported)
+      assert.isTrue(reported.every(error => error === down))
+    } finally {
+      if (original) holder.reportError = original
+      else delete holder.reportError
+    }
+  })
+
+  test('state throws for a store returning a thenable that is not a native promise', ({
+    assert,
+  }) => {
+    const memory = new MemoryCircuitBreakerStore()
+    const store: CircuitBreakerStore = {
+      admit: (...args) => memory.admit(...args),
+      record: (...args) => memory.record(...args),
+      isolate: (...args) => memory.isolate(...args),
+      release: (...args) => memory.release(...args),
+      state: (...args) => {
+        const resolveWith = (resolve: (value: CircuitState) => void) =>
+          resolve(memory.state(...args))
+        // oxlint-disable-next-line unicorn/no-thenable
+        return { then: resolveWith } as unknown as Promise<CircuitState>
+      },
+    }
+    const breaker = new CircuitBreaker({ store })
+    assert.throws(() => breaker.state, TypeError)
   })
 
   test('a custom store can be written with the exported state machine', async ({ assert }) => {

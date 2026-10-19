@@ -22,6 +22,9 @@ type MaybePromise<T> = T | Promise<T>
  *
  * Tickets are fenced: a result recorded with a ticket from an older generation (the
  * circuit transitioned since the call was admitted) is ignored.
+ *
+ * A failing `admit` fails the call with an `UnexpectedError` without running it. A failing
+ * `record`, or `state` read for notifications, is reported and keeps the result of the call.
  */
 export interface CircuitBreakerStore {
   admit(now: number, config: BreakerConfig): MaybePromise<Admission>

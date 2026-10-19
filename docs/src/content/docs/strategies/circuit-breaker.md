@@ -33,7 +33,7 @@ new CircuitBreaker(options?: CircuitBreakerOptions)
 | `openFor`       | `Duration \| (openCount: number) => Duration` | `'30s'`                               | How long the circuit stays open before it admits trial calls. Must be finite: use `isolate()` to keep a circuit open. |
 | `halfOpen`      | `{ permits?, successes?, maxWait? }`          | see [Half-open](#half-open)           | How trial calls run.                                                                                                  |
 | `classify`      | `(result: AnyResult) => CallOutcome`          | see [Classification](#classification) | How a finished call counts.                                                                                           |
-| `onStateChange` | `({ from, to }) => void`                      |                                       | Called after each state change.                                                                                       |
+| `onStateChange` | `({ from, to }) => void`                      |                                       | Called after each state change. An error it throws is reported, not returned.                                         |
 | `store`         | `CircuitBreakerStore`                         | `MemoryCircuitBreakerStore`           | Where the state lives. See [Stores](#stores).                                                                         |
 | `clock`         | `Clock`                                       | system clock                          | Clock for open durations and windows. Not the execution clock.                                                        |
 
@@ -153,7 +153,9 @@ interface CircuitBreakerStore {
 }
 ```
 
-Every operation receives the current time and the configuration. `admit` returns a ticket with a generation number. `record` must ignore a ticket from an older generation, so that late results from before a transition do not move the circuit.
+Every operation receives the current time and the configuration. `admit` returns a ticket with a generation number. `record` must ignore a ticket from an older generation, so that late results from before a transition do not move the circuit. The `state` reads behind `onStateChange` and events may complete in any order: a read that completes after a newer one is dropped, so no stale transition is reported.
+
+An `admit` that throws or rejects fails the call with an `UnexpectedError` whose `cause` is the store error, without running it. A failing `record`, or a failing `state` read for `onStateChange` and events, does not change the result of the call: the error is reported with `globalThis.reportError`, or as an uncaught error where it is missing, as on Node.js.
 
 To write a store, reuse the state machine of the memory store, exported as `circuitBreakerMachine`. A store keeps one `MachineState`, plain data safe to serialize as JSON. It starts from `initialState(config)`, replaces the state with the result of `admit`, `record`, `isolate`, and `release`, and answers `state()` with `currentState`. In a distributed store, each replacement must be atomic, with a transaction or a compare-and-set. The `MachineState`, `WindowState`, and `TimeBucket` types are exported too.
 

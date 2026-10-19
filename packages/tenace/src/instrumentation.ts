@@ -49,7 +49,11 @@ export type TenaceEvent =
     }
   | { readonly type: 'fallback.used'; readonly error: unknown }
   | { readonly type: 'fallback.stale'; readonly key: string; readonly ageMs: number }
-  | { readonly type: 'rate_limit.rejected'; readonly key: string; readonly retryAfterMs: number }
+  | {
+      readonly type: 'rate_limit.rejected'
+      readonly key: string
+      readonly retryAfterMs: number | undefined
+    }
   | { readonly type: 'lock.rejected'; readonly key: string }
   | { readonly type: 'dedupe.joined'; readonly key: string }
   | { readonly type: 'cache.hit'; readonly key: string }

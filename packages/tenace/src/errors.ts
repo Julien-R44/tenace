@@ -191,12 +191,15 @@ export class RateLimitError extends TenaceError {
   declare readonly name: 'RateLimitError'
   readonly key: string
   /**
-   * When a call may be admitted again. Retries wait at least this long.
+   * When a call may be admitted again. Retries wait at least this long. `undefined` when
+   * the store gave no positive wait.
    */
-  readonly retryAfterMs: number
+  readonly retryAfterMs: number | undefined
 
-  constructor(key: string, retryAfterMs: number) {
-    super(`Rate limit exceeded for "${key}", retry after ${retryAfterMs}ms`)
+  constructor(key: string, retryAfterMs: number | undefined) {
+    super(
+      `Rate limit exceeded for "${key}"${retryAfterMs === undefined ? '' : `, retry after ${retryAfterMs}ms`}`,
+    )
     this.key = key
     this.retryAfterMs = retryAfterMs
   }

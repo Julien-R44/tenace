@@ -21,7 +21,16 @@ test.group('Adapters | rate-limiter-flexible', () => {
     assert.deepEqual(await policy.settle(() => 1), ok(1))
     const rejected = await policy.settle(() => 2)
     assert.isTrue(!rejected.ok && rejected.error instanceof RateLimitError)
-    assert.isAbove((rejected as { error: RateLimitError }).error.retryAfterMs, 59_000)
+    assert.isAbove((rejected as { error: RateLimitError }).error.retryAfterMs!, 59_000)
+  })
+
+  test('a limit that never resets denies with an infinite retryAfterMs', async ({ assert }) => {
+    const store = rateLimiterFlexible(new RateLimiterMemory({ points: 1, duration: 0 }))
+    assert.deepEqual(await store.consume('k', 0), { allowed: true, retryAfterMs: 0 })
+    assert.deepEqual(await store.consume('k', 0), {
+      allowed: false,
+      retryAfterMs: Number.POSITIVE_INFINITY,
+    })
   })
 
   test('store errors reject', async ({ assert }) => {

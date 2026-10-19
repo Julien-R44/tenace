@@ -120,6 +120,37 @@ test.group('RateLimit', () => {
     assert.equal(store.size, 1)
   })
 
+  test('a denial without a positive wait is rejected right away, never asked again', async ({
+    assert,
+  }) => {
+    const clock = new TestClock(1.7e12)
+    for (const [retryAfterMs, maxWait] of [
+      [0, '1s'],
+      [-1, '1s'],
+      [Number.NaN, '1s'],
+      [undefined, '1s'],
+      [1e-5, 0],
+    ] as const) {
+      let calls = 0
+      const store = {
+        // bails out instead of spinning forever when asked again
+        consume: () => ({ allowed: ++calls > 100, retryAfterMs: retryAfterMs as number }),
+      }
+      const settled = Tenace.policy()
+        .withRateLimit({ store, maxWait, clock })
+        .settle(() => 'ran')
+      const late = new Promise<'still waiting'>(resolve => setTimeout(resolve, 50, 'still waiting'))
+      const result = await Promise.race([settled, late])
+      assert.equal(calls, 1, `retryAfterMs: ${retryAfterMs}, maxWait: ${maxWait}`)
+      assert.isTrue(
+        result !== 'still waiting' &&
+          !result.ok &&
+          result.error instanceof RateLimitError &&
+          result.error.retryAfterMs === (retryAfterMs === 1e-5 ? 1e-5 : undefined),
+      )
+    }
+  })
+
   test('a store failure is an UnexpectedError', async ({ assert }) => {
     const down = new Error('redis down')
     const result = await Tenace.policy()
@@ -244,6 +275,36 @@ test.group('Lock', () => {
     const provider = new MemoryLockProvider()
     const signal = AbortSignal.abort()
     await provider.acquire('k', { signal, timeoutMs: undefined, ttlMs: undefined })
+    assert.equal(provider.size, 0)
+  })
+
+  test('the memory provider never hands a key to two holders', async ({ assert }) => {
+    const provider = new MemoryLockProvider()
+    const options = { signal: new AbortController().signal, timeoutMs: 0, ttlMs: undefined }
+
+    // a lease released twice
+    const a = await provider.acquire('k', options)
+    await a!.release()
+    const b = await provider.acquire('k', options)
+    await a!.release()
+    assert.isUndefined(await provider.acquire('k', options))
+    await b!.release()
+
+    // a waiter that aborted, then the key taken again in the same tick
+    const holder = await provider.acquire('k', options)
+    const controller = new AbortController()
+    const waiting = provider.acquire('k', {
+      ...options,
+      signal: controller.signal,
+      timeoutMs: 1000,
+    })
+    controller.abort()
+    void holder!.release()
+    const next = provider.acquire('k', options)
+    assert.isUndefined(await waiting)
+    assert.isDefined(await next)
+    assert.isUndefined(await provider.acquire('k', options))
+    await (await next)!.release()
     assert.equal(provider.size, 0)
   })
 

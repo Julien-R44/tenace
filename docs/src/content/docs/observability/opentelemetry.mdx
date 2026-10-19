@@ -85,7 +85,7 @@ With `spanEvents: true`, each Tenace event becomes an event on the execution spa
 | `bulkhead.rejected`                                         | `tenace.bulkhead.name`, `tenace.bulkhead.running`, `tenace.bulkhead.queued`                     |
 | `fallback.used`                                             | `error.type`                                                                                    |
 | `fallback.stale`                                            | `tenace.key`, `tenace.stale.age_ms`                                                             |
-| `rate_limit.rejected`                                       | `tenace.key`, `tenace.retry_after_ms`                                                           |
+| `rate_limit.rejected`                                       | `tenace.key`, `tenace.retry_after_ms` when set                                                  |
 | `lock.rejected`, `dedupe.joined`, `cache.hit`, `cache.miss` | `tenace.key`                                                                                    |
 | `cache.stale`, `cache.failed`                               | `tenace.key`, `error.type`                                                                      |
 | `custom`                                                    | `tenace.event.custom_name`, and the attributes of the event                                     |

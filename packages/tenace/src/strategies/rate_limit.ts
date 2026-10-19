@@ -10,7 +10,8 @@ import { type Next, Strategy } from '../strategy.ts'
 export interface RateLimitDecision {
   readonly allowed: boolean
   /**
-   * When the next call may be allowed (0 when allowed).
+   * When the next call may be allowed (0 when allowed). A denial without a positive wait
+   * is rejected right away, even with `maxWait`.
    */
   readonly retryAfterMs: number
 }
@@ -153,11 +154,17 @@ export class RateLimit extends Strategy<RateLimitError> {
       }
       if (decision.allowed) return next(context)
 
-      if (clock.now() + decision.retryAfterMs > deadline) {
-        context.emit({ type: 'rate_limit.rejected', key, retryAfterMs: decision.retryAfterMs })
-        return err(new RateLimitError(key, decision.retryAfterMs))
+      // a denial without a positive wait cannot be waited on: asking again right away spins
+      const retryAfterMs = decision.retryAfterMs > 0 ? decision.retryAfterMs : undefined
+      if (
+        retryAfterMs === undefined ||
+        this.#maxWaitMs <= 0 ||
+        clock.now() + retryAfterMs > deadline
+      ) {
+        context.emit({ type: 'rate_limit.rejected', key, retryAfterMs })
+        return err(new RateLimitError(key, retryAfterMs))
       }
-      if (!(await sleep(clock, decision.retryAfterMs, context.signal))) {
+      if (!(await sleep(clock, retryAfterMs, context.signal))) {
         return err(new UnexpectedError(context.signal.reason))
       }
     }

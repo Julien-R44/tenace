@@ -33,7 +33,7 @@ When neither the lock nor the execution has a key, the execution rejects with a 
 
 The default `MemoryLockProvider` gives one holder per key, in arrival order, within the process. Every `Lock` without a `provider` shares one `MemoryLockProvider`, so two policies that each call `.withLock({ key: 'reports' })` exclude each other. Locks are not reentrant: a call that waits for a key it already holds, such as a nested policy locking the same execution key, waits until its `timeout`, or forever without one. Give nested locks distinct keys.
 
-A call that waits longer than `timeout` fails with `LockNotAcquiredError`. A call whose signal aborts leaves the queue, and does not run even if the lock is acquired at that moment. `provider.size` returns the number of keys a `MemoryLockProvider` holds or waits for.
+A call that waits longer than `timeout` fails with `LockNotAcquiredError`. A call whose signal aborts leaves the queue, and does not run even if the lock is acquired at that moment. `provider.size` returns the number of keys a `MemoryLockProvider` holds or waits for. Releasing one of its leases twice releases once.
 
 The lock strategy releases the lock when the steps inside it finish. It ignores a failure to release, because a distributed lock expires on its own and the call already finished. A failure to acquire, such as an unreachable Redis, becomes an `UnexpectedError`.
 

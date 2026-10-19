@@ -16,7 +16,7 @@ const policy = Tenace.policy()
 expectType<Equal<ErrorOf<typeof policy>, UnexpectedError | LockNotAcquiredError | RateLimitError>>()
 
 const result = await policy
-  .withFallbackOn(['RateLimitError'], error => error.retryAfterMs)
+  .withFallbackOn(['RateLimitError'], error => error.retryAfterMs ?? 0)
   .settle(() => 'x', { key: 'k' })
 expectType<Equal<typeof result, Result<string | number, UnexpectedError | LockNotAcquiredError>>>()
 

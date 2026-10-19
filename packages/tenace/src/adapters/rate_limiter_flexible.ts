@@ -27,7 +27,8 @@ function isRejection(value: unknown): value is { msBeforeNext: number } {
  * ```
  *
  * Store failures (the limiter rejected with an `Error`) reject: the execution fails with
- * that error as an `UnexpectedError`.
+ * that error as an `UnexpectedError`. A limit that never resets (`duration: 0`) denies
+ * with an infinite `retryAfterMs`.
  */
 export function rateLimiterFlexible(limiter: RateLimiterFlexibleLike): RateLimitStore {
   return {
@@ -36,8 +37,14 @@ export function rateLimiterFlexible(limiter: RateLimiterFlexibleLike): RateLimit
         await limiter.consume(key, 1)
         return { allowed: true, retryAfterMs: 0 }
       } catch (error) {
-        if (isRejection(error))
-          return { allowed: false, retryAfterMs: Math.max(0, error.msBeforeNext) }
+        // -1 when the limit never resets (`duration: 0`)
+        if (isRejection(error)) {
+          const { msBeforeNext } = error
+          return {
+            allowed: false,
+            retryAfterMs: msBeforeNext < 0 ? Number.POSITIVE_INFINITY : msBeforeNext,
+          }
+        }
         throw error
       }
     },
