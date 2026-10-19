@@ -31,7 +31,7 @@ const restore = Tenace.instrument(
 )
 ```
 
-The `instrumentation` option of a policy adds an instrumentation for that policy. The default one still runs and wraps it: its `execution()` starts first and ends last. Passing the default instrumentation itself to a policy runs it once, but two separate `openTelemetry()` instances record every execution twice. Set `instrumentation: false` to turn the default one off for a policy.
+The `instrumentation` option of a policy adds an instrumentation for that policy. The default one still runs and wraps it: its `execution()` starts first and ends last. An instrumentation that is already part of the default one runs once, even when the policy combines it with others. Two separate `openTelemetry()` instances still record every execution twice. Set `instrumentation: false` to turn the default one off for a policy.
 
 ```ts
 import { listener, Tenace } from '@julr/tenace'
@@ -115,7 +115,7 @@ const timing: Instrumentation = {
 Tenace.instrument(timing)
 ```
 
-`combine(...instrumentations)` merges several into one. The first wraps the others: its `execution()` starts first and ends last. An `event` handler that throws does not keep the event from the others.
+`combine(...instrumentations)` merges several into one. The first wraps the others: its `execution()` starts first and ends last. An instrumentation given twice, directly or through another `combine()`, runs once. An `event` handler that throws does not keep the event from the others.
 
 ## When an instrumentation fails
 
@@ -125,7 +125,7 @@ A bug in an instrumentation never changes the outcome of an execution. Tenace en
 - `run` and the `run` of `attempt` call your function at most once. A second call rejects with a `TypeError`, which is reported.
 - The caller always gets the outcome of `run`, whatever the hook returns.
 - An `execution()` or `attempt()` hook that settles without calling `run` is reported, and the execution runs without it.
-- Events emitted after the execution settled are dropped.
+- Events emitted after the execution settled are dropped, and attempts started after it skip the `attempt()` hook. This happens when a [dedupe](/strategies/dedupe/) run keeps going for other callers after its first caller aborts.
 
 A hook that never settles still blocks the execution.
 

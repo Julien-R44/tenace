@@ -19,7 +19,7 @@ import type {
 } from './fold.ts'
 import { type AnyResult, err, type Result } from './result.ts'
 import { toResult } from './result_registry.ts'
-import { combine, type Attributes, type Instrumentation } from './instrumentation.ts'
+import { combine, type Attributes, type Instrumentation, withoutGlobal } from './instrumentation.ts'
 import { guardInstrumentation } from './internal/core_instrumentation.ts'
 import { diagnosticsChannel } from './internal/diagnostics_channel.ts'
 import { getGlobalChaos, getGlobalInstrumentation } from './internal/global_instrumentation.ts'
@@ -94,7 +94,7 @@ export interface PolicyOptions {
   readonly name?: string
   /**
    * Instrumentation of this policy, added to the one set with `Tenace.instrument()` (the
-   * global one wraps it; the same instance set in both places runs once). `false` turns
+   * global one wraps it; an instance already in the global one runs once). `false` turns
    * the global one off for this policy. Executions are also published on
    * `node:diagnostics_channel` when it has subscribers.
    *
@@ -560,8 +560,8 @@ export class Policy<
   #instrumentation(): Instrumentation | undefined {
     const configured = this.#options.instrumentation
     const global = configured === false ? undefined : getGlobalInstrumentation()
-    // the same instrumentation set globally and on the policy runs once
-    const own = configured === false || configured === global ? undefined : configured
+    // an instrumentation set globally and on the policy runs once
+    const own = configured === false ? undefined : withoutGlobal(configured, global)
     const channel = diagnosticsChannel()
     const observed = channel?.isActive() ? channel : undefined
     if (!global && !own && !observed) return undefined

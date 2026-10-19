@@ -32,8 +32,8 @@ Every error extends `TenaceError` and has a literal `_tag`, a stable `code`, and
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `_tag`                                | The literal discriminant of the error union.                                                           |
 | `code`                                | A stable `E_*` identifier, for logs and serialization.                                                 |
-| `name`                                | The class name. Not an enumerable field.                                                               |
+| `name`                                | The `static readonly tag`, else the class name. An own field.                                          |
 | `toJSON()`                            | The tag, the code, the name, the message, the own enumerable fields, and the cause, without the stack. |
 | `new TenaceError(message, { cause })` | The constructor of the subclasses.                                                                     |
 
-`instanceof TenaceError` and `isTenaceError(value)` recognize errors from any copy of the package. `instanceof` on a subclass with a `static readonly tag` compares the tags, so it also works across copies. See [Define an error](/concepts/typed-errors/#define-an-error).
+`instanceof TenaceError` and `isTenaceError(value)` recognize errors from any copy of the package. `instanceof` on a subclass with a `static readonly tag` compares the tags, so it also works across copies, then checks the prototype chain, so a subclass with its own tag is still an instance of its parent. The tag is also the `name`, which stays stable when a minifier renames the class. See [Define an error](/concepts/typed-errors/#define-an-error).

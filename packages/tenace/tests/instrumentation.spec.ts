@@ -215,6 +215,27 @@ test.group('Instrumentation | global', () => {
     assert.deepEqual(global.types(), ['retry.scheduled', 'retry.exhausted'])
   })
 
+  test('members of a combined instrumentation run once', async ({ assert }) => {
+    const a = recorder()
+    const b = recorder()
+    const c = recorder()
+    const run = (instrumentation: Instrumentation) =>
+      Tenace.policy({ instrumentation })
+        .withRetry({ retries: 1, delay: 0 })
+        .settle(() => err('x'))
+    const restore = Tenace.instrument(a.instrumentation, b.instrumentation)
+    try {
+      await run(a.instrumentation)
+      await run(combine(b.instrumentation, c.instrumentation, c.instrumentation))
+    } finally {
+      restore()
+    }
+    const twice = ['retry.scheduled', 'retry.exhausted', 'retry.scheduled', 'retry.exhausted']
+    assert.deepEqual(a.types(), twice)
+    assert.deepEqual(b.types(), twice)
+    assert.deepEqual(c.types(), ['retry.scheduled', 'retry.exhausted'])
+  })
+
   test('instrumentation: false turns the global one off for a policy', async ({ assert }) => {
     const global = recorder()
     const restore = Tenace.instrument(global.instrumentation)

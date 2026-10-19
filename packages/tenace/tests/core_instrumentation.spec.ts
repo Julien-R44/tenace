@@ -160,6 +160,40 @@ test.group('Instrumentation | contract', () => {
     last?.emit({ type: 'custom', name: 'after' })
     assert.deepEqual(events, [{ type: 'custom', name: 'during' }])
   })
+
+  test('attempts started once the execution settled skip the attempt hook', async ({ assert }) => {
+    const log: string[] = []
+    let executions = 0
+    const instrumentation: Instrumentation = {
+      async execution(_info, run) {
+        const id = ++executions
+        try {
+          return await run({
+            attempt: (info, fn) => (log.push(`${id}:attempt:${info.attempt}`), fn()),
+            event: () => {},
+          })
+        } finally {
+          log.push(`${id}:end`)
+        }
+      },
+    }
+    const policy = Tenace.policy({ instrumentation })
+      .withRetry({ retries: 2, delay: 20 })
+      .withDedupe()
+    const controller = new AbortController()
+    let calls = 0
+    const fn = () => (++calls, err('nope'))
+    // A leads the shared run, B joins it, then A aborts: the run keeps going for B
+    const a = policy.settle(fn, { signal: controller.signal, key: 'k' })
+    const b = policy.settle(fn, { key: 'k' })
+    setTimeout(() => controller.abort('stop'), 5)
+    await a.catch(() => {})
+    await b
+    assert.equal(calls, 3)
+    const ended = log.indexOf('1:end')
+    assert.notInclude(log.slice(ended), '1:attempt:2')
+    assert.notInclude(log.slice(ended), '1:attempt:3')
+  })
 })
 
 test.group('Instrumentation | caller abort', () => {

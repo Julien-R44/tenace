@@ -57,9 +57,9 @@ if (!result.ok && result.error instanceof NotFound) {
 `TenaceError` gives you:
 
 - `code`, a stable identifier for logs and serialization, such as `E_NOT_FOUND`.
-- `name`, set to the class name.
+- `name`, set to the `static readonly tag` of the class, or to the class name without it. Declare the tag for a stable name: minifiers rename classes.
 - `toJSON()`, which returns the tag, the code, the name, the message, the own fields, and the cause, without the stack trace.
-- An `instanceof` check that works across duplicated copies of the package. With `static readonly tag` set to the value of `_tag`, `instanceof NotFound` also works across copies of your own class. Without it, `instanceof` checks the prototype chain.
+- An `instanceof` check that works across duplicated copies of the package. With `static readonly tag` set to the value of `_tag`, `instanceof NotFound` also works across copies of your own class. `instanceof` also checks the prototype chain, so a subclass of `NotFound` with its own tag is still a `NotFound`.
 
 `isTenaceError(value)` returns `true` for any error created by any copy of Tenace.
 

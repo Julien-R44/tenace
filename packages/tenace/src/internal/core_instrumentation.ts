@@ -83,11 +83,14 @@ function guardScope(scope: ExecutionScope, isDone: () => boolean): ExecutionScop
   if (scope === noopScope) return noopScope
   return {
     attempt: (info, fn) =>
-      enforce(
-        proceed => scope.attempt(info, () => proceed(undefined)),
-        () => fn(),
-        undefined,
-      ),
+      // a shared run (dedupe) can outlive the execution: no hook under a settled span
+      isDone()
+        ? fn()
+        : enforce(
+            proceed => scope.attempt(info, () => proceed(undefined)),
+            () => fn(),
+            undefined,
+          ),
     event: event => {
       if (isDone()) return
       try {
@@ -128,7 +131,7 @@ const guarded = new WeakMap<Instrumentation, Instrumentation>()
  * Enforces the instrumentation contract, so instrumentation bugs never change the outcome
  * of an execution (see `enforce`). Scope hooks are guarded too: an `attempt` hook follows
  * the same rules, an `event` handler that throws is reported and does not reach the
- * strategies, and events emitted once the execution settled are dropped.
+ * strategies, and events and attempt hooks once the execution settled are skipped.
  */
 export function guardInstrumentation(instrumentation: Instrumentation): Instrumentation {
   let guard = guarded.get(instrumentation)

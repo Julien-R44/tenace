@@ -6,9 +6,6 @@ import type { CircuitState } from './strategies/circuit_breaker/machine.ts'
 export type Attributes = Readonly<Record<string, string | number | boolean>>
 
 /**
- * Everything strategies report. `attempt` is 1-based.
- */
-/**
  * What a retry event is about: the error of the attempt, or the value `retryIfValue`
  * rejected (`'value' in event`).
  */
@@ -16,6 +13,9 @@ export type RetryEventCause =
   | { readonly error: unknown }
   | { readonly value: unknown; readonly error?: undefined }
 
+/**
+ * Everything strategies report. `attempt` is 1-based.
+ */
 export type TenaceEvent =
   | ({
       readonly type: 'retry.scheduled'
@@ -127,14 +127,33 @@ function safely(fn: () => void): void {
   }
 }
 
+// registered, so every copy of Tenace reads the members of the default instrumentation
+const MEMBERS: unique symbol = Symbol.for('@julr/tenace/instrumentation/members') as never
+
+/**
+ * The instrumentations merged by `combine()`, or the instrumentation itself.
+ */
+function membersOf(instrumentation: Instrumentation): readonly Instrumentation[] {
+  return (
+    (instrumentation as { [MEMBERS]?: readonly Instrumentation[] })[MEMBERS] ?? [instrumentation]
+  )
+}
+
 /**
  * Runs several instrumentations: the first one wraps the others. An event handler that
  * throws does not keep the event from the others, its error is reported (see `listener()`).
+ * An instrumentation given twice, directly or through another `combine()`, runs once.
  */
 export function combine(...items: readonly Instrumentation[]): Instrumentation {
-  if (items.length === 0) return noopInstrumentation
-  if (items.length === 1) return items[0]!
-  return items.reduceRight((inner, outer) => ({
+  const members: Instrumentation[] = []
+  for (const item of items) {
+    for (const member of membersOf(item)) {
+      if (!members.includes(member)) members.push(member)
+    }
+  }
+  if (members.length === 0) return noopInstrumentation
+  if (members.length === 1) return members[0]!
+  const combined = members.reduceRight((inner, outer) => ({
     execution: (info, run) =>
       outer.execution(info, outerScope =>
         inner.execution(info, innerScope =>
@@ -149,6 +168,34 @@ export function combine(...items: readonly Instrumentation[]): Instrumentation {
         ),
       ),
   }))
+  Object.defineProperty(combined, MEMBERS, { value: Object.freeze(members) })
+  return combined
+}
+
+const remainders = new WeakMap<
+  Instrumentation,
+  { readonly global: Instrumentation; readonly rest: Instrumentation | undefined }
+>()
+
+/**
+ * The instrumentation of a policy without what the global one already runs. `undefined`
+ * when nothing is left.
+ */
+export function withoutGlobal(
+  own: Instrumentation | undefined,
+  global: Instrumentation | undefined,
+): Instrumentation | undefined {
+  if (own === undefined || global === undefined) return own
+  if (own === global) return undefined
+  if (!(MEMBERS in own) && !(MEMBERS in global)) return own
+  // cached: guards are cached per instrumentation object, combine() creates a new one
+  const cached = remainders.get(own)
+  if (cached?.global === global) return cached.rest
+  const shared = membersOf(global)
+  const left = membersOf(own).filter(member => !shared.includes(member))
+  const rest = left.length === 0 ? undefined : combine(...left)
+  remainders.set(own, { global, rest })
+  return rest
 }
 
 /**

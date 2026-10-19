@@ -10,25 +10,20 @@ const ERROR_BRAND: unique symbol = Symbol.for('@julr/tenace/error') as never
  *
  * Subclasses must declare `_tag` and `code` as literal readonly fields. Declaring
  * `static readonly tag` with the same value as `_tag` makes `instanceof` work across
- * copies of the subclass too, otherwise the regular prototype check is used.
+ * copies of the subclass too. The prototype chain is checked as well, so a subclass with
+ * its own tag stays an instance of its parent. The tag is also the `name`, which stays
+ * stable when a minifier renames the class.
  */
 export abstract class TenaceError extends Error {
   abstract readonly _tag: string
   abstract readonly code: string
 
+  // an own field like `_tag`: survives frozen prototypes and serializers listing own names.
+  // A field is defined (not assigned), and costs far less than defineProperty
+  override name: string = nameOf(this.constructor)
+
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options)
-    // once per class: defining properties on every instance is slow
-    const prototype = new.target.prototype
-    if (!Object.hasOwn(prototype, 'name')) {
-      // a frozen prototype (SES, harden()) cannot take it: keep it on the instance
-      Object.defineProperty(Object.isExtensible(prototype) ? prototype : this, 'name', {
-        value: new.target.name,
-        writable: true,
-        configurable: true,
-        enumerable: false,
-      })
-    }
   }
 
   static {
@@ -38,8 +33,9 @@ export abstract class TenaceError extends Error {
   static override [Symbol.hasInstance](value: unknown): boolean {
     if (!isTenaceError(value)) return false
     if (this === TenaceError) return true
-    if (Object.hasOwn(this, 'tag')) {
-      return value._tag === (this as unknown as { tag: unknown }).tag
+    // the tag matches copies of the class, the prototype chain matches subclasses
+    if (Object.hasOwn(this, 'tag') && value._tag === (this as unknown as { tag: unknown }).tag) {
+      return true
     }
     return Function.prototype[Symbol.hasInstance].call(this, value)
   }
@@ -58,6 +54,14 @@ export abstract class TenaceError extends Error {
       ...(this.cause !== undefined && { cause: serializeCause(this.cause) }),
     }
   }
+}
+
+/**
+ * The `static tag` of the class, else its name: minifiers rename classes, not strings.
+ */
+function nameOf(constructor: Function): string {
+  const tag = Object.hasOwn(constructor, 'tag') ? (constructor as { tag?: unknown }).tag : undefined
+  return typeof tag === 'string' ? tag : constructor.name
 }
 
 function serializeCause(cause: unknown): unknown {

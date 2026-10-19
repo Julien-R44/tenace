@@ -1,6 +1,6 @@
 import { test } from '@japa/runner'
 
-import { isTenaceError, TenaceError, UnexpectedError } from '../src/errors.ts'
+import { isTenaceError, TenaceError, TimeoutError, UnexpectedError } from '../src/errors.ts'
 import type * as ErrorsModule from '../src/errors.ts'
 
 class HttpError extends TenaceError {
@@ -41,6 +41,19 @@ test.group('TenaceError', () => {
     assert.isFalse(new HttpError(500) instanceof UntaggedStaticError)
   })
 
+  test('a subclass with its own tag is still an instance of its parent', ({ assert }) => {
+    class MyTimeout extends TimeoutError {
+      // the built-in tags are literal types: `as never` lets the subclass retag itself
+      static override readonly tag = 'MyTimeout' as never
+      override readonly _tag = 'MyTimeout' as never
+    }
+    const error = new MyTimeout(1)
+    assert.isTrue(error instanceof MyTimeout)
+    assert.isTrue(error instanceof TimeoutError)
+    assert.isTrue(error instanceof TenaceError)
+    assert.isFalse(new TimeoutError(1) instanceof MyTimeout)
+  })
+
   test('instanceof and isTenaceError work across copies of the module', async ({ assert }) => {
     const copy = (await import(
       // @ts-expect-error query string loads a second, independent copy of the module
@@ -68,6 +81,35 @@ test.group('TenaceError', () => {
     assert.equal(error.name, 'FrozenError')
     assert.isTrue(error.stack?.startsWith('FrozenError: frozen'))
     assert.isTrue(isTenaceError(error))
+  })
+
+  test('name is an own writable property, even once the prototype is frozen', ({ assert }) => {
+    class OwnNameError extends TenaceError {
+      readonly _tag = 'OwnNameError' as const
+      readonly code = 'E_OWN_NAME' as const
+    }
+    const first = new OwnNameError('first')
+    assert.include(Object.getOwnPropertyNames(first), 'name')
+    assert.include(JSON.stringify(first, Object.getOwnPropertyNames(first)), '"OwnNameError"')
+
+    Object.freeze(OwnNameError.prototype)
+    const second = new OwnNameError('second') as { name: string }
+    second.name = 'Renamed'
+    assert.equal(second.name, 'Renamed')
+  })
+
+  test('name is the static tag, so it survives minification', ({ assert }) => {
+    // a minifier renames the class: `class HttpError` becomes `class t`
+    const t = class extends TenaceError {
+      static readonly tag = 'MinifiedError'
+      readonly _tag = 'MinifiedError' as const
+      readonly code = 'E_MINIFIED' as const
+    }
+    const error = new t('minified')
+    assert.equal(t.name, 't')
+    assert.equal(error.name, 'MinifiedError')
+    assert.match(String(error), /^MinifiedError: minified/)
+    assert.isTrue(error.stack?.startsWith('MinifiedError: minified'))
   })
 
   test('toJSON has tag, code, own fields and cause but no stack', ({ assert }) => {
@@ -121,10 +163,10 @@ test.group('UnexpectedError', () => {
 })
 
 test.group('TenaceError | logging', () => {
-  test('name defaults to the class name and is not an enumerable field', ({ assert }) => {
+  test('name defaults to the class name and is an own field', ({ assert }) => {
     const error = new HttpError(500)
     assert.equal(error.name, 'HttpError')
-    assert.deepEqual(Object.keys(error), ['_tag', 'code', 'status'])
+    assert.deepEqual(Object.keys(error), ['name', '_tag', 'code', 'status'])
     assert.match(String(error), /^HttpError: HTTP 500/)
   })
 })
