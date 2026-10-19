@@ -189,6 +189,24 @@ test.group('openTelemetry', group => {
     assert.equal(state?.dataPoints[0]?.value, 1)
   })
 
+  test('an error that cannot be stringified still ends every span', async ({ assert }) => {
+    const { instrumentation, spans, byName, metric } = setup()
+    const result = await Tenace.policy({ name: 'opaque', instrumentation })
+      .withRetry({ retries: 1, delay: 0 })
+      .settle(async () => err(Object.create(null)))
+    assert.isFalse(result.ok)
+
+    assert.sameMembers(
+      spans().map(span => span.name),
+      ['opaque attempt', 'opaque attempt', 'opaque'],
+    )
+    const [root] = byName('opaque')
+    assert.equal(root!.attributes['error.type'], '_OTHER')
+    assert.equal(root!.status.message, '[object Object]')
+    const attemptDurations = await metric('tenace.attempt.duration')
+    assert.equal((attemptDurations!.dataPoints[0]!.value as { count: number }).count, 2)
+  })
+
   test('nested retries count every call of the function', async ({ assert }) => {
     const { instrumentation, byName, metric } = setup()
     await Tenace.policy({ name: 'nested-retries', instrumentation })
@@ -267,5 +285,23 @@ test.group('openTelemetry', group => {
     assert.equal(errorType(new RangeError('x')), 'RangeError')
     assert.equal(errorType({ _tag: 'Custom' }), 'Custom')
     assert.equal(errorType('string'), '_OTHER')
+  })
+
+  test('errorType of an Error subclass that keeps the default name is its class name', async ({
+    assert,
+  }) => {
+    class PaymentDeclined extends Error {}
+    class Named extends Error {
+      override name = 'CustomName'
+    }
+    assert.equal(errorType(new PaymentDeclined('x')), 'PaymentDeclined')
+    assert.equal(errorType(new Named('x')), 'CustomName')
+    assert.equal(errorType(new Error('x')), 'Error')
+
+    const { instrumentation, byName } = setup()
+    await Tenace.policy({ name: 'pay', instrumentation }).settle(() => {
+      throw new PaymentDeclined('declined')
+    })
+    assert.equal(byName('pay')[0]!.attributes['error.type'], 'PaymentDeclined')
   })
 })

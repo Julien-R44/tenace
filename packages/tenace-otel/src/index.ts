@@ -45,32 +45,80 @@ const STATE_VALUE: Record<CircuitState, number> = {
 }
 
 /**
- * Low cardinality `error.type`: the `_tag` of Tenace errors, the class name of thrown
- * errors, `_OTHER` otherwise.
+ * Low cardinality `error.type`, the type of the error (thrown values are unwrapped from
+ * `UnexpectedError`):
+ * - the `_tag` of Tenace errors and of any object with a string `_tag`,
+ * - for an `Error`, its `name`, or its class name when `name` is the default `'Error'`
+ *   (`class PaymentDeclined extends Error {}` gives `PaymentDeclined`),
+ * - `_OTHER` otherwise.
+ *
+ * Never throws.
  */
 export function errorType(error: unknown): string {
-  if (error instanceof UnexpectedError) return errorType(error.cause)
-  if (isTenaceError(error)) return error._tag
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    typeof (error as { _tag?: unknown })._tag === 'string'
-  ) {
-    return (error as { _tag: string })._tag
-  }
-  if (error instanceof Error) return error.name || error.constructor.name
+  try {
+    if (error instanceof UnexpectedError) return errorType(error.cause)
+    if (isTenaceError(error)) return error._tag
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      typeof (error as { _tag?: unknown })._tag === 'string'
+    ) {
+      return (error as { _tag: string })._tag
+    }
+    if (error instanceof Error) {
+      if (typeof error.name === 'string' && error.name && error.name !== 'Error') {
+        return error.name
+      }
+      const className: unknown = error.constructor?.name
+      return typeof className === 'string' && className ? className : 'Error'
+    }
+  } catch {}
   return '_OTHER'
+}
+
+/**
+ * Message of a thrown value. Never throws, even for null-prototype objects or a throwing
+ * `toString()` (same logic as the message of `UnexpectedError`).
+ */
+function describe(value: unknown): string {
+  try {
+    if (value instanceof Error && typeof value.message === 'string') return value.message
+    return String(value)
+  } catch {
+    try {
+      return Object.prototype.toString.call(value)
+    } catch {
+      return 'Unknown error'
+    }
+  }
+}
+
+/**
+ * Runs every telemetry call even when one throws (a buggy span processor, exporter or
+ * meter), so spans are always ended and metrics recorded. The first error is rethrown
+ * afterwards: Tenace reports it without changing the outcome of the execution.
+ */
+function runAll(...steps: ReadonlyArray<() => unknown>): void {
+  let failure: { error: unknown } | undefined
+  for (const step of steps) {
+    try {
+      step()
+    } catch (error) {
+      failure ??= { error }
+    }
+  }
+  if (failure) throw failure.error
 }
 
 function recordError(span: Span, error: unknown): void {
   const raw = error instanceof UnexpectedError ? error.cause : error
   const type = errorType(error)
-  span.setAttribute('error.type', type)
-  span.recordException(raw instanceof Error ? raw : { name: type, message: String(raw) })
-  span.setStatus({
-    code: SpanStatusCode.ERROR,
-    message: raw instanceof Error ? raw.message : String(raw),
-  })
+  const message = describe(raw)
+  runAll(
+    () => span.setAttribute('error.type', type),
+    () => span.recordException(raw instanceof Error ? raw : { name: type, message }),
+    () => span.setStatus({ code: SpanStatusCode.ERROR, message }),
+  )
 }
 
 /**
@@ -239,7 +287,7 @@ export function openTelemetry(options: OpenTelemetryOptions = {}): Instrumentati
         const running = new Set<Span>()
         let attempts = 0
         let ended = false
-        let outcome: Attributes = {}
+        let failure: { error: unknown } | undefined
 
         try {
           const result = await run({
@@ -263,14 +311,16 @@ export function openTelemetry(options: OpenTelemetryOptions = {}): Instrumentati
                   } finally {
                     // otherwise abandoned: ended with the execution
                     if (running.delete(span)) {
-                      if (result && !result.ok) recordError(span, result.error)
-                      span.end()
-                      instruments.attemptDuration.record(
-                        (performance.now() - attemptStarted) / 1000,
-                        {
-                          ...base,
-                          ...(result && !result.ok && { 'error.type': errorType(result.error) }),
-                        },
+                      const failed = result && !result.ok ? result : undefined
+                      const duration = (performance.now() - attemptStarted) / 1000
+                      runAll(
+                        () => failed && recordError(span, failed.error),
+                        () => span.end(),
+                        () =>
+                          instruments.attemptDuration.record(duration, {
+                            ...base,
+                            ...(failed && { 'error.type': errorType(failed.error) }),
+                          }),
                       )
                     }
                   }
@@ -286,31 +336,39 @@ export function openTelemetry(options: OpenTelemetryOptions = {}): Instrumentati
               if (spanEvents) root.addEvent(eventName(event), eventAttributes(event))
             },
           })
-          if (!result.ok) {
-            outcome = { 'error.type': errorType(result.error) }
-            recordError(root, result.error)
-          }
+          if (!result.ok) failure = { error: result.error }
           return result
         } catch (error) {
-          outcome = { 'error.type': errorType(error) }
-          recordError(root, error)
+          failure = { error }
           throw error
         } finally {
           ended = true
-          for (const span of running) {
-            span.setAttribute('tenace.attempt.abandoned', true)
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: 'The execution ended before the attempt settled',
-            })
-            span.end()
-          }
+          const duration = (performance.now() - started) / 1000
+          const abandoned = [...running]
           running.clear()
-          root.setAttribute('tenace.attempts', attempts)
-          root.end()
-          const attributes = { ...base, ...outcome }
-          instruments.executionDuration.record((performance.now() - started) / 1000, attributes)
-          instruments.attemptCount.record(attempts, attributes)
+          const attributes = {
+            ...base,
+            ...(failure && { 'error.type': errorType(failure.error) }),
+          }
+          runAll(
+            ...abandoned.map(
+              span => () =>
+                runAll(
+                  () => span.setAttribute('tenace.attempt.abandoned', true),
+                  () =>
+                    span.setStatus({
+                      code: SpanStatusCode.ERROR,
+                      message: 'The execution ended before the attempt settled',
+                    }),
+                  () => span.end(),
+                ),
+            ),
+            () => failure && recordError(root, failure.error),
+            () => root.setAttribute('tenace.attempts', attempts),
+            () => root.end(),
+            () => instruments.executionDuration.record(duration, attributes),
+            () => instruments.attemptCount.record(attempts, attributes),
+          )
         }
       })
     },

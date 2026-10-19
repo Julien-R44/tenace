@@ -40,7 +40,7 @@ The default tracer and meter are looked up on each execution, so you can call `o
   - the `attributes` passed to `execute()`.
 - **One child span per attempt** (`<name> attempt`) with `tenace.attempt.number`, the attempt number of the innermost retry. With nested retries, it starts again at 1 for each outer attempt. Spans created by your function nest under it.
 - **Abandoned attempts.** An attempt still running when the execution ends, such as a function that ignored a timeout, ends with the execution span, with the `ERROR` status and `tenace.attempt.abandoned: true`. It is not recorded in `tenace.attempt.duration`.
-- **Errors.** A failed attempt gets the `ERROR` status and `error.type` (the `_tag` of the error, or the class name of a thrown one) on its own span. The execution span gets them only when the execution fails in the end, so a retried attempt does not mark it as failed.
+- **Errors.** A failed attempt gets the `ERROR` status and `error.type` (the `_tag` of the error, else the `name` of an `Error` or its class name when `name` is the default `'Error'`, else `_OTHER`) on its own span. The execution span gets them only when the execution fails in the end, so a retried attempt does not mark it as failed.
 - **Events.** Tenace events (`retry.scheduled`, `timeout`, `circuit.state_changed`, `fallback.used`...) are recorded as span events on the execution span. A retry caused by a value has `tenace.retry.cause: 'value'` and no `error.type`.
 
 ## Metrics

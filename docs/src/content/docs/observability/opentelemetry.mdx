@@ -68,7 +68,7 @@ An attempt still running when the execution ends, such as after an aggressive ti
 
 A failed attempt gets the `ERROR` status, an exception event, and `error.type` on its own span. The execution span gets them only when the execution fails in the end, so an attempt that a retry or a fallback recovered from does not mark the execution as failed.
 
-`error.type` is the `_tag` of a Tenace error or of any tagged error, the class name of a thrown `Error`, or `_OTHER`. The package exports the `errorType(error)` function that computes it.
+`error.type` is the `_tag` of a Tenace error or of any object with a string `_tag`. For another `Error`, it is its `name`, or its class name when `name` is the default `'Error'`: `new TypeError()` gives `TypeError`, and `class PaymentDeclined extends Error {}` gives `PaymentDeclined`. Any other value gives `_OTHER`. The package exports the `errorType(error)` function that computes it.
 
 ### Span events
 
