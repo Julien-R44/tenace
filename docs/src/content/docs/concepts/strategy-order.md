@@ -46,6 +46,8 @@ Most placement questions come down to what the outer strategy should see: every 
 
 **Circuit breaker.** Inside a retry, the breaker records every attempt, so one execution with three failed attempts counts as three failures. Outside a retry, it records only the final outcome. Once the circuit is open, a retry outside the breaker receives `CircuitOpenError` and stops: retrying would only wait until the circuit admits calls again, up to the default `openFor` of 30 seconds. List `CircuitOpenError` in `retryOn` to wait for it, `retryAfterMs` included.
 
+A timeout outside the breaker never opens the circuit: when it fires, it aborts the signal of the call, and the breaker ignores aborted calls. Add the timeout before the breaker so that slow calls count as failures.
+
 **Bulkhead.** Outside a retry, one execution holds one slot for all its attempts and delays. Inside a retry, each attempt takes a slot and gives it back during the delay.
 
 **Lock.** Outside a retry, the lock is held during every attempt and delay. Inside a retry, each attempt acquires the lock again.

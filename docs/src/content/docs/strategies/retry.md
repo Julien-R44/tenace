@@ -112,6 +112,8 @@ const listUsersPolicy = Tenace.policy().withRetry({ retries: 3, budget })
 
 Over the window, the budget allows `minPerSecond * window in seconds + ratio * executions` retries. Each execution of a retry that uses the budget counts once. When the budget is exhausted, the retry returns the last result, an error or a value rejected by `retryIfValue`, and emits `retry.declined` with the reason `budget`.
 
+A custom strategy can use a budget too: call `budget.recordExecution(clock?)` once per execution, and `budget.tryAcquire(clock?)` before each retry. `tryAcquire` returns `false` when the budget is exhausted.
+
 ## Idempotency
 
 Running a payment or an email twice is not safe. Pass `idempotent: false` to `execute()` or `settle()` for these calls:

@@ -208,7 +208,7 @@ Executions that nothing observes skip every hook.
 | `withFallback()`, `withFallbackOn()`, `withFallbackWhen()`, `mapError()` | removes the errors it handles | [Fallback](https://tenace.julr.dev/strategies/fallback/)               |
 | `withChaos()`                                                            | the error it injects          | [Chaos](https://tenace.julr.dev/strategies/chaos/)                     |
 
-Rate limits, locks and caches run in memory by default. Adapters for [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible), [Verrou](https://verrou.dev) and [BentoCache](https://bentocache.dev) are included: see [Keys and adapters](https://tenace.julr.dev/guides/keys-and-adapters/).
+Rate limits and locks run in memory by default, and a cache takes a provider. Adapters for [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible), [Verrou](https://verrou.dev) and [BentoCache](https://bentocache.dev) are included: see [Keys and adapters](https://tenace.julr.dev/guides/keys-and-adapters/).
 
 ## License
 

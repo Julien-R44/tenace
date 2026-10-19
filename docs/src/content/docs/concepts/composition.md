@@ -43,7 +43,7 @@ const charge = Tenace.policy().withTimeout('2s').with(breaker)
 const refund = Tenace.policy().withTimeout('5s').with(breaker) // same circuit
 ```
 
-The stateful strategies are `CircuitBreaker`, `Bulkhead`, `RateLimit`, `Lock`, `Dedupe`, and `StaleFallback`. A `RetryBudget` passed to several retries is shared the same way.
+The stateful strategies are `CircuitBreaker`, `Bulkhead`, `RateLimit`, `Lock`, `Dedupe`, and `StaleFallback`. A `RetryBudget` passed to several retries is shared the same way. Locks also share their provider: every `Lock` without a `provider` uses one in-process provider, so two separate locks on the same key exclude each other.
 
 A `withX(options)` call creates a new instance. Two policies built with their own `.withCircuitBreaker({ ... })` calls have two separate circuits. Derived policies are different: `base.withRetry(...)` copies the strategy references of `base`, so every policy derived from `base` shares its breaker.
 
@@ -72,3 +72,26 @@ charge.describe() // ['fallback', 'payments-api', 'payments-api', 'timeout']
 ```
 
 The inlined policy contributes its strategies only. The `name` and `instrumentation` options of the outer policy apply. A policy bound with `Tenace.call(fn)` cannot be inlined.
+
+## Optional strategies
+
+Each strategy changes the type of the policy, so a policy cannot be reassigned with an extra strategy:
+
+```ts nocheck
+let policy = Tenace.call(send)
+if (timeout !== undefined) policy = policy.withTimeout(timeout) // type error
+```
+
+When a strategy comes from optional configuration, add it with a value that does nothing instead. A timeout of `Infinity` never fires, and `retries: 0` runs a single attempt:
+
+```ts
+import { Tenace } from '@julr/tenace'
+
+declare const config: { timeout?: number; retries?: number }
+
+const policy = Tenace.policy()
+  .withTimeout(config.timeout ?? Number.POSITIVE_INFINITY)
+  .withRetry({ retries: config.retries ?? 0 })
+```
+
+The type of the policy then includes `TimeoutError` even without a timeout, which only means one more case to handle.

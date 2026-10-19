@@ -115,7 +115,7 @@ const timing: Instrumentation = {
 Tenace.instrument(timing)
 ```
 
-`combine(...instrumentations)` merges several into one. The first wraps the others: its `execution()` starts first and ends last. An instrumentation given twice, directly or through another `combine()`, runs once. An `event` handler that throws does not keep the event from the others.
+`combine(...instrumentations)` merges several into one. The first wraps the others: its `execution()` starts first and ends last. An instrumentation given twice, directly or through another `combine()`, runs once. An `event` handler that throws does not keep the event from the others. With no argument it returns `noopInstrumentation`, which observes nothing.
 
 ## When an instrumentation fails
 

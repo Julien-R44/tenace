@@ -13,6 +13,12 @@ Tenace is ESM only and has no runtime dependencies. It runs on:
 
 The CI of the repository runs the test suite on Node.js 22, 24, and 26 and on Bun, and runs the built bundle in workerd through Miniflare, with and without `nodejs_compat`.
 
+## TypeScript
+
+The types need TypeScript 5.9 or later, the oldest version the CI typechecks against, along with TypeScript 7, both with `strict` enabled. The package exports ESM only: use the `module` resolution `nodenext`, `node16`, or `bundler`, not `node10`.
+
+## Runtime-dependent features
+
 The package has no static `node:` import. Two features depend on the runtime:
 
 - **`diagnostics_channel`.** Tenace loads it with `process.getBuiltinModule()` the first time an execution runs. Where it is missing, such as Workers without `nodejs_compat`, nothing is published and nothing fails. See [diagnostics_channel](/observability/diagnostics-channel/).
