@@ -13,6 +13,8 @@ const lock = new Lock({ key: 'reports', timeout: '5s' })
 const policy = Tenace.policy().withTimeout('1m').with(lock)
 ```
 
+The default provider holds locks in the process. With several instances, see [Distributed locks](/distributed/locks/) to hold them in Redis or a database.
+
 ## API
 
 ```ts nocheck
@@ -27,7 +29,7 @@ new Lock(options?: LockOptions)
 | `timeout`  | `Duration`     | as long as the signal allows  | Longest time to wait for the lock.                                       |
 | `ttl`      | `Duration`     | the provider default          | Longest time the lock is held, for distributed providers.                |
 
-When neither the lock nor the execution has a key, the execution rejects with a `TypeError`. Pass a key per call with `execute(fn, { key })`. See [Keys](/guides/keys-and-adapters/).
+When neither the lock nor the execution has a key, the execution rejects with a `TypeError`. Pass a key per call with `execute(fn, { key })`. See [Keys](/concepts/keys/).
 
 ## Behavior
 
@@ -60,7 +62,7 @@ interface LockLease {
 }
 ```
 
-`acquire()` resolves with a lease, or with `undefined` when the lock was not acquired in time. For distributed locks, use the [Verrou adapter](/guides/keys-and-adapters/#verrou).
+`acquire()` resolves with a lease, or with `undefined` when the lock was not acquired in time. For locks shared between instances, see [Distributed locks](/distributed/locks/).
 
 ## Events
 

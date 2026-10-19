@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config'
 
 export default defineConfig({
   site: 'https://tenace.julr.dev',
+  redirects: { '/guides/keys-and-adapters': '/distributed/overview/' },
   integrations: [
     starlight({
       title: 'Tenace',
@@ -61,6 +62,7 @@ export default defineConfig({
             'concepts/execute-and-settle',
             'concepts/typed-errors',
             'concepts/reusable-and-bound-policies',
+            'concepts/keys',
             'concepts/composition',
             'concepts/cancellation',
           ],
@@ -82,12 +84,21 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Distributed',
+          items: [
+            'distributed/overview',
+            'distributed/rate-limits',
+            'distributed/locks',
+            'distributed/cache',
+            'distributed/custom-backends',
+          ],
+        },
+        {
           label: 'Guides',
           items: [
             'guides/results',
             'guides/batches',
             'guides/wait-for',
-            'guides/keys-and-adapters',
             'guides/testing',
             'guides/custom-strategies',
             'guides/custom-result-types',

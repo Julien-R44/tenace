@@ -25,6 +25,7 @@ catalog:
   astro: ^7.4.0
   bentocache: ^1.6.1
   del-cli: ^8.0.1
+  ioredis: ^5.11.1
   rate-limiter-flexible: ^11.2.3
   satori: ^0.63.0
   tsdown: ^0.23.1

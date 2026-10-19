@@ -13,6 +13,8 @@ const policy = Tenace.policy().withRateLimit({ limit: 10, per: '1s', maxWait: '5
 await policy.execute(() => getUser(id), { key: `user:${id}` })
 ```
 
+The default limiter counts the calls of one process. With several instances, see [Shared rate limits](/distributed/rate-limits/) to count them in Redis or a database.
+
 ## API
 
 ```ts nocheck
@@ -27,7 +29,7 @@ Pass either `limit` and `per` for the in-memory limiter, or a `store`:
 | `limit`   | `number`         | required without `store`            | Calls allowed per `per`. An integer of 1 or more.                       |
 | `per`     | `Duration`       | required without `store`            | The period.                                                             |
 | `store`   | `RateLimitStore` | a `MemoryRateLimitStore`            | Where calls are counted. Replaces `limit` and `per`.                    |
-| `key`     | `string`         | the execution key, then `'default'` | Key to count calls against. See [Keys](/guides/keys-and-adapters/).     |
+| `key`     | `string`         | the execution key, then `'default'` | Key to count calls against. See [Keys](/concepts/keys/).                |
 | `maxWait` | `Duration`       | `0`                                 | Wait for a slot instead of failing, when the wait is at most this long. |
 | `clock`   | `Clock`          | the execution clock                 | Clock that gives the store the current time.                            |
 
@@ -61,7 +63,7 @@ interface RateLimitDecision {
 }
 ```
 
-`consume()` takes one call from the key and returns whether it is allowed. For a limit shared between processes, use the [`rate-limiter-flexible` adapter](/guides/keys-and-adapters/#rate-limiter-flexible) or implement the interface.
+`consume()` takes one call from the key and returns whether it is allowed. For a limit shared between processes, see [Shared rate limits](/distributed/rate-limits/).
 
 A store that throws or rejects fails the call with an `UnexpectedError` whose `cause` is the store error. `execute()` rejects with the store error itself, like any throw.
 

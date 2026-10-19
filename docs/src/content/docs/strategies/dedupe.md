@@ -30,7 +30,7 @@ new Dedupe(options?: DedupeOptions)
 | ------ | -------- | ----------------- | ------------------------------------------------------------------------------------------- |
 | `key`  | `string` | the execution key | Key identifying identical calls. A key is required, from this option or from the execution. |
 
-When neither the dedupe nor the execution has a key, the execution rejects with a `TypeError`. See [Keys](/guides/keys-and-adapters/).
+When neither the dedupe nor the execution has a key, the execution rejects with a `TypeError`. See [Keys](/concepts/keys/).
 
 A `Dedupe` instance exposes `pending`, the number of keys running now.
 

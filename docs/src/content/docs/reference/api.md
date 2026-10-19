@@ -76,7 +76,7 @@ See [execute() and settle()](/concepts/execute-and-settle/).
 | `signal`     | `AbortSignal` |                 | Aborting it stops the execution. The promise rejects with `signal.reason`, without running `fn` when already aborted. |
 | `clock`      | `Clock`       | `systemClock`   | Clock of the time-based strategies of this execution. See [Testing](/guides/testing/).                                |
 | `name`       | `string`      | the policy name | Operation name reported to instrumentation.                                                                           |
-| `key`        | `string`      |                 | Key of the execution. See [Keys](/guides/keys-and-adapters/).                                                         |
+| `key`        | `string`      |                 | Key of the execution. See [Keys](/concepts/keys/).                                                                    |
 | `idempotent` | `boolean`     | `true`          | `false` when running the function twice is not safe. See [Idempotency](/strategies/retry/#idempotency).               |
 | `attributes` | `Attributes`  | `{}`            | Extra attributes reported to instrumentation. Keep them low cardinality.                                              |
 

@@ -23,7 +23,7 @@ const users = Tenace.policy()
 await users.execute(() => getUser(id), { key: `user:${id}` })
 ```
 
-Tenace does not implement a cache. It calls a provider: the [BentoCache adapter](/guides/keys-and-adapters/#bentocache), or a few lines around your own cache.
+Tenace does not implement a cache. It calls a provider: the [BentoCache adapter](/distributed/cache/), or a few lines around your own cache.
 
 ## API
 

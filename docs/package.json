@@ -26,6 +26,7 @@
     "@types/node": "catalog:",
     "@verrou/core": "catalog:",
     "bentocache": "catalog:",
+    "ioredis": "catalog:",
     "rate-limiter-flexible": "catalog:",
     "satori": "catalog:",
     "typescript": "catalog:",
