@@ -1,6 +1,14 @@
 import type { Clock } from '../clock.ts'
 
 /**
+ * Resolves after a task of the global timers, so a loop that never waits on a timer (retries
+ * without delay of a function failing synchronously) lets the other timers and I/O run.
+ */
+export function yieldToEventLoop(): Promise<void> {
+  return new Promise(resolve => globalThis.setTimeout(resolve, 0))
+}
+
+/**
  * Waits `ms` milliseconds on the given clock. Never rejects: resolves `true` when the
  * delay elapsed, `false` as soon as the signal aborts (or immediately if already aborted).
  * `Infinity` only ends with the signal, `NaN` is treated as `0`.

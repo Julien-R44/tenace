@@ -63,6 +63,21 @@ test.group('Retry | attempts', () => {
     )
   })
 
+  test('retries without delay let the timeout of the caller fire', async ({ assert }) => {
+    let calls = 0
+    const result = await Tenace.policy()
+      .withRetry({ retries: Number.POSITIVE_INFINITY, delay: 0 })
+      .withTimeout(20)
+      .settle(() => {
+        // without yielding, the timeout never fires: stop the loop to fail instead of hanging
+        if (++calls > 200_000) return 'starved'
+        throw new Error('down')
+      })
+
+    assert.isFalse(result.ok)
+    assert.instanceOf(!result.ok && result.error, TimeoutError)
+  })
+
   test('retries: 0 runs a single attempt', async ({ assert }) => {
     const { fn, calls } = flaky(10)
     await Tenace.policy().withRetry({ retries: 0 }).settle(fn)

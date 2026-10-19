@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
-import { sleep } from '../internal/sleep.ts'
+import { sleep, yieldToEventLoop } from '../internal/sleep.ts'
 import type { AnyResult } from '../result.ts'
 import { type Next, Strategy } from '../strategy.ts'
 import type { TagOf } from '../types.ts'
@@ -117,6 +117,13 @@ const NOT_RUN_TAGS: ReadonlySet<unknown> = new Set([
 const defaultDelay = backoff.exponential()
 
 /**
+ * Retries without delay run on microtasks only, and would starve the event loop (and the
+ * timeout of the caller) if the function fails synchronously. Every so many of them, the
+ * retry yields to the event loop.
+ */
+const IMMEDIATE_RETRIES_PER_YIELD = 100
+
+/**
  * Retries the inner steps when they fail, or when `retryIfValue` rejects their value. Stops
  * on an accepted result, when retries are exhausted, when the cause is not retryable, or as
  * soon as the signal aborts. Returns the last result.
@@ -152,6 +159,7 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
   async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
     this.#options.budget?.recordExecution(context.clock)
 
+    let immediateRetries = 0
     for (let attempt = 1; ; attempt++) {
       const result = await next(context.with({ attempt }))
       if (context.signal.aborted) return result
@@ -185,8 +193,14 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
       } as RetryEvent<E, V>)
       context.emit({ type: 'retry.scheduled', attempt, delayMs, ...cause })
 
-      const waited = await sleep(context.clock, delayMs, context.signal)
-      if (!waited) return result
+      if (delayMs > 0) {
+        immediateRetries = 0
+        const waited = await sleep(context.clock, delayMs, context.signal)
+        if (!waited) return result
+      } else {
+        if (++immediateRetries % IMMEDIATE_RETRIES_PER_YIELD === 0) await yieldToEventLoop()
+        if (context.signal.aborted) return result
+      }
     }
   }
 
