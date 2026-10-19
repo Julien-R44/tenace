@@ -25,7 +25,7 @@ await waitFor(
 
 | Option     | Type                                | Default        | Description                                                                   |
 | ---------- | ----------------------------------- | -------------- | ----------------------------------------------------------------------------- |
-| `interval` | `Duration \| (attempt) => Duration` | `100ms`        | Delay between two checks. See [Intervals](#intervals).                        |
+| `interval` | `Duration \| (attempt) => Duration` | `100ms`        | Delay between two checks, 1ms at least. See [Intervals](#intervals).          |
 | `timeout`  | `Duration`                          | `10s`          | Longest wait, from the call. `Infinity` waits until the signal aborts.        |
 | `signal`   | `AbortSignal`                       |                | Stops waiting.                                                                |
 | `clock`    | `Clock`                             | the system one | Clock of the delays and the timeout, such as a [TestClock](/guides/testing/). |

@@ -5,10 +5,17 @@ import { TimeoutError } from './errors.ts'
 import { onAbort } from './internal/race_signal.ts'
 import { sleep } from './internal/sleep.ts'
 
+/**
+ * Shortest delay between two checks. Without a timer between them, a synchronous condition
+ * would loop on microtasks and the timeout would never fire.
+ */
+const MIN_INTERVAL_MS = 1
+
 export interface WaitForOptions {
   /**
    * Delay between two checks: a duration, or a function of the 1-based number of checks
-   * done so far, such as `backoff.exponential()`. Defaults to `100ms`.
+   * done so far, such as `backoff.exponential()`. Delays under 1ms are rounded up to 1ms.
+   * Defaults to `100ms`.
    */
   readonly interval?: Duration | ((attempt: number) => Duration)
   /**
@@ -98,7 +105,7 @@ function poll(
         if (ready) return end()
 
         const delay = toMs(typeof interval === 'function' ? interval(attempt) : interval)
-        if (!(await sleep(clock, delay, signal))) return
+        if (!(await sleep(clock, Math.max(delay, MIN_INTERVAL_MS), signal))) return
       }
     }
 

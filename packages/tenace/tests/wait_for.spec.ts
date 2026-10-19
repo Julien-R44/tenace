@@ -49,6 +49,23 @@ test.group('waitFor', () => {
     assert.deepEqual(checks, [0, 100, 300, 600])
   })
 
+  test('an interval of 0 waits 1ms, so the timeout can fire', async ({ assert }) => {
+    const clock = new TestClock()
+    const checks: number[] = []
+    const done = waitFor(
+      () => {
+        checks.push(clock.now())
+        // without a timer between checks, this loop would never end
+        return checks.length === 3 || checks.length > 1000
+      },
+      { interval: 0, clock },
+    )
+
+    await clock.advance('1s')
+    await done
+    assert.deepEqual(checks, [0, 1, 2])
+  })
+
   test('rejects with a TimeoutError at the deadline, even during a check', async ({ assert }) => {
     const clock = new TestClock()
     let checkSignal: AbortSignal | undefined
