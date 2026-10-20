@@ -1,4 +1,4 @@
-# Tenace
+![Tenace: resilience you can type-check](https://tenace.julr.dev/banner.png)
 
 Resilience policies for TypeScript that know every error they can return.
 
