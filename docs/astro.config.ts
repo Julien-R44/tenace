@@ -102,6 +102,7 @@ export default defineConfig({
             'guides/testing',
             'guides/custom-strategies',
             'guides/custom-result-types',
+            'guides/adonisjs',
           ],
         },
         {

@@ -63,7 +63,7 @@ if (!result.ok && result.error instanceof NotFound) {
 
 `isTenaceError(value)` returns `true` for any error created by any copy of Tenace.
 
-Errors do not have to extend `TenaceError`. Any object with a literal `_tag` works with `retryOn`, `withFallbackOn()`, and `Result.match()`. Errors without a `_tag`, such as a string, still flow through the channel, and only the handlers that take every error can handle them: `withFallback()`, `withFallbackWhen()`, `mapError()`, `retryIf`, and the `_` case of `Result.match()`. `withFallbackWhen()` handles them but does not remove them from the channel, because a type guard on an untagged class proves nothing about what it matches at runtime.
+Errors do not have to extend `TenaceError`. Any object with a literal `_tag` works with `retryOn`, `withFallbackOn()`, and `Result.match()`, such as the exceptions of your framework: see [Use with AdonisJS](/guides/adonisjs/). Errors without a `_tag`, such as a string, still flow through the channel, and only the handlers that take every error can handle them: `withFallback()`, `withFallbackWhen()`, `mapError()`, `retryIf`, and the `_` case of `Result.match()`. `withFallbackWhen()` handles them but does not remove them from the channel, because a type guard on an untagged class proves nothing about what it matches at runtime.
 
 ## Match a Result
 

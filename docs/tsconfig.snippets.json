@@ -5,7 +5,12 @@
     "declaration": false,
     "isolatedDeclarations": false,
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    // framework code, such as AdonisJS classes, uses parameter properties, plain overrides,
+    // and `params.city`
+    "erasableSyntaxOnly": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false
   },
-  "include": [".snippets/**/*.ts", "snippets.d.ts", "scripts"]
+  "include": [".snippets/**/*.ts", "snippets.d.ts", "adonis_snippets.d.ts", "scripts"]
 }

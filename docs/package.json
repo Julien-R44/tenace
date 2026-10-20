@@ -17,6 +17,7 @@
     "astro": "catalog:"
   },
   "devDependencies": {
+    "@adonisjs/core": "catalog:",
     "@fontsource/geist": "catalog:",
     "@fontsource/geist-mono": "catalog:",
     "@julr/tenace": "workspace:^",
