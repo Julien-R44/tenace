@@ -231,14 +231,13 @@ The documentation is an [Astro Starlight](https://starlight.astro.build) site in
 
 ### Releasing
 
-Each package is released with [release-it](https://github.com/release-it/release-it) from its own directory (version bump, commit, tag, `pnpm publish`, push, GitHub release). Release `@julr/tenace` first, then `@julr/tenace-otel`:
+Releases go through [Changesets](https://changesets.dev). Add a changeset to each pull request that changes a published package:
 
 ```sh
-cd packages/tenace && pnpm release        # tag v<version>
-cd ../tenace-otel && pnpm release         # tag tenace-otel@v<version>
+pnpm changeset   # pick the packages and the bump, then describe the change
 ```
 
-Always publish with pnpm (`pnpm release` does): it replaces `workspace:` and `catalog:` specifiers with real ranges, `npm publish` is refused. Bump the `@julr/tenace` peer range of `@julr/tenace-otel` by hand when it needs a newer core.
+On every push to `main`, the `release` workflow opens or updates a "version packages" pull request that bumps the versions and writes the changelogs. Merging it publishes the new versions to npm with [trusted publishing](https://docs.npmjs.com/trusted-publishers), then pushes the git tags and creates the GitHub releases. No npm token is involved.
 
 ## License
 

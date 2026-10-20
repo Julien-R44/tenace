@@ -1,7 +1,5 @@
 # Changelog
 
-## 2.0.0
-
 Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime dependencies. The API changed everywhere: see [Breaking changes](#breaking-changes) below.
 
 ### Highlights

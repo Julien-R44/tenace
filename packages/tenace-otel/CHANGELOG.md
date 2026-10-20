@@ -1,7 +1,5 @@
 # Changelog
 
-## 2.0.0
-
 First release. `openTelemetry()` returns a Tenace instrumentation that records traces and metrics through `@opentelemetry/api`. Pass it to `Tenace.instrument()` for every policy, or to the `instrumentation` option of one policy.
 
 - **Traces**: one span per execution, one child span per attempt, and the Tenace events as span events. A retried attempt does not mark the execution span as failed.

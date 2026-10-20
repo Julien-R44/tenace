@@ -63,54 +63,22 @@
     "typecheck:ts5": "node ./node_modules/typescript-5/bin/tsc --noEmit",
     "test": "node --conditions=tenace-source --import=@poppinss/ts-exec --enable-source-maps bin/test.ts",
     "test:bun": "bun --conditions=tenace-source bin/test.ts",
-    "release": "release-it",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "@japa/assert": "catalog:",
     "@japa/runner": "catalog:",
     "@poppinss/ts-exec": "catalog:",
-    "@release-it/conventional-changelog": "^12.0.2",
     "@types/node": "catalog:",
     "@verrou/core": "catalog:",
     "bentocache": "catalog:",
     "del-cli": "catalog:",
     "rate-limiter-flexible": "catalog:",
-    "release-it": "^21.1.1",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "typescript-5": "catalog:"
   },
   "engines": {
     "node": ">=22.18.0"
-  },
-  "release-it": {
-    "git": {
-      "requireCleanWorkingDir": true,
-      "requireUpstream": true,
-      "commitMessage": "chore(release): @julr/tenace@${version}",
-      "tagName": "v${version}",
-      "tagAnnotation": "v${version}",
-      "push": true
-    },
-    "github": {
-      "release": true
-    },
-    "npm": {
-      "publish": true,
-      "skipChecks": true,
-      "publishPackageManager": "pnpm",
-      "publishArgs": [
-        "--no-git-checks"
-      ]
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": {
-          "name": "angular"
-        },
-        "path": "."
-      }
-    }
   }
 }
