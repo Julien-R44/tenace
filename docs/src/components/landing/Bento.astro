@@ -24,7 +24,7 @@ const cards = [
   {
     label: 'Typed errors',
     title: 'The compiler knows every error.',
-    text: 'Result.match() needs one handler per error, so a new strategy fails the build until you handle it.',
+    text: 'Your functions return Result.err(), strategies add their errors. Result.match() needs one handler for each of them.',
     href: '/concepts/typed-errors/',
     code: snippets.typed,
     shape: { src: '/bento/typed.jpg' },

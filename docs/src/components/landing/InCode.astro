@@ -23,9 +23,17 @@ const tabs = [
     id: 'typed',
     label: 'Typed errors',
     title: 'The compiler knows every error.',
-    text: 'Strategies add their errors to the type of the policy and fallbacks remove them. Result.match() needs one handler per error, so a new strategy fails the build until you handle it.',
+    text: 'Your functions return Result.err(), strategies add their errors to the type of the policy, and fallbacks remove them. Result.match() needs one handler per error, so a new error fails the build until you handle it.',
     href: '/concepts/typed-errors/',
     code: snippets.typed,
+  },
+  {
+    id: 'result',
+    label: 'Result',
+    title: 'A Result type for your own code.',
+    text: 'The same Result that Tenace uses inside, small on purpose: Result.ok(), Result.err(), Result.try(), and Result.match(). A service can return its expected failures as Results without any policy.',
+    href: '/concepts/result-pattern/',
+    code: snippets.result,
   },
   {
     id: 'chaos',

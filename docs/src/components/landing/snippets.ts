@@ -26,20 +26,46 @@ const users = await Tenace.map(ids, fetchUser, {
   concurrency: 5,
 }).execute()`
 
-export const typed = `const policy = Tenace.policy()
+export const typed = `async function findUser(id: string, signal: AbortSignal) {
+  const user = await db.users.find(id, { signal })
+  if (!user) return Result.err(new NotFound(id))
+  return Result.ok(user)
+}
+
+const result = await Tenace.policy()
   .withTimeout('1s')
-  .withCircuitBreaker()
+  .settle(({ signal }) => findUser(id, signal))
 
-type Failure = ErrorOf<typeof policy>
-// UnexpectedError | TimeoutError | CircuitOpenError
+const status = Result.match(result, {
+  ok: () => 200,
+  NotFound: () => 404,
+  TimeoutError: () => 504,
+  UnexpectedError: () => 500,
+})`
 
-const result = await policy.settle(() => fetchUser(id))
+export const result = `import { Result } from '@julr/tenace/result'
 
-const message = Result.match(result, {
-  ok: user => \`Hello \${user.name}\`,
-  TimeoutError: () => 'The user service is slow',
-  CircuitOpenError: () => 'The user service is down',
-  UnexpectedError: () => 'Something went wrong',
+function readInvite(token: string) {
+  return Result.try({
+    try: () => invites.verify(token),
+    catch: cause => new InvalidInvite(token, { cause }),
+  })
+}
+
+async function signup(email: string, token: string) {
+  const invite = readInvite(token)
+  if (!invite.ok) return invite
+
+  if (await emailExists(email)) return Result.err(new EmailTaken(email))
+  return Result.ok(await createUser(email, invite.value))
+}
+
+const result = await signup(email, token)
+
+const status = Result.match(result, {
+  ok: () => 201,
+  EmailTaken: () => 409,
+  InvalidInvite: () => 422,
 })`
 
 export const chaos = `// 1 call in 5 takes 2s longer: the timeout fires
