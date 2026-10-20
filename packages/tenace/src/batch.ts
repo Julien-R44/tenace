@@ -2,7 +2,7 @@ import type { Clock } from './clock.ts'
 import type { Context } from './context.ts'
 import { linkSignal } from './internal/signal.ts'
 import type { AnyPolicy, Fn } from './policy.ts'
-import type { AnyResult } from './result/core.ts'
+import type { Result } from './result/namespace.ts'
 
 export interface BatchOptions<P> {
   /**
@@ -63,7 +63,7 @@ export class Batch<Values extends readonly unknown[], Results extends readonly u
 
   async settle(options: BatchRunOptions = {}): Promise<Results> {
     const policy = this.#policy as unknown as {
-      settle(fn: Fn, options: object): Promise<AnyResult>
+      settle(fn: Fn, options: object): Promise<Result.Any>
     }
     return (await this.#run(options, false, (task, runOptions) =>
       policy.settle(task, runOptions),

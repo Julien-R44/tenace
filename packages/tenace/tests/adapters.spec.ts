@@ -9,7 +9,7 @@ import { bentocache } from '../src/adapters/bentocache.ts'
 import { rateLimiterFlexible } from '../src/adapters/rate_limiter_flexible.ts'
 import { verrou } from '../src/adapters/verrou.ts'
 import { LockNotAcquiredError, RateLimitError } from '../src/errors.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Tenace } from '../src/tenace.ts'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -18,7 +18,7 @@ test.group('Adapters | rate-limiter-flexible', () => {
   test('maps allowed and rejected consumptions', async ({ assert }) => {
     const store = rateLimiterFlexible(new RateLimiterMemory({ points: 1, duration: 60 }))
     const policy = Tenace.policy().withRateLimit({ store, key: 'user:1' })
-    assert.deepEqual(await policy.settle(() => 1), ok(1))
+    assert.deepEqual(await policy.settle(() => 1), Result.ok(1))
     const rejected = await policy.settle(() => 2)
     assert.isTrue(!rejected.ok && rejected.error instanceof RateLimitError)
     assert.isAbove((rejected as { error: RateLimitError }).error.retryAfterMs!, 59_000)
@@ -52,7 +52,7 @@ test.group('Adapters | verrou', () => {
 
     release()
     await holder
-    assert.deepEqual(await policy.settle(() => 'after'), ok('after'))
+    assert.deepEqual(await policy.settle(() => 'after'), Result.ok('after'))
   })
 
   test('honors the timeout exactly: 0 tries once, others do not overshoot', async ({ assert }) => {
@@ -115,7 +115,10 @@ test.group('Adapters | bentocache', () => {
     const policy = Tenace.policy().withCache({ provider: bentocache(bento), ttl: '1m' })
     let calls = 0
 
-    assert.deepEqual(await policy.settle(() => err('nope'), { key: 'k' }), err('nope'))
+    assert.deepEqual(
+      await policy.settle(() => Result.err('nope'), { key: 'k' }),
+      Result.err('nope'),
+    )
     assert.equal(await policy.execute(() => ++calls, { key: 'k' }), 1)
     assert.equal(await policy.execute(() => ++calls, { key: 'k' }), 1)
     assert.equal(calls, 1)
@@ -136,14 +139,19 @@ test.group('Adapters | bentocache', () => {
     const policy = Tenace.policy().withCache({ provider: bentocache(bento), ttl: 20 })
 
     try {
-      assert.deepEqual(await policy.settle(() => 'fresh', { key: 'k' }), ok('fresh'))
+      assert.deepEqual(await policy.settle(() => 'fresh', { key: 'k' }), Result.ok('fresh'))
       await sleep(40)
       // the stale value is served while the call refreshes it in the background
-      const stale = await policy.settle(async () => (await sleep(10), err('down')), { key: 'k' })
-      assert.deepEqual(stale, ok('fresh'))
+      const stale = await policy.settle(async () => (await sleep(10), Result.err('down')), {
+        key: 'k',
+      })
+      assert.deepEqual(stale, Result.ok('fresh'))
       await sleep(20)
       // a call failing right away also gets the stale value bentocache serves
-      assert.deepEqual(await policy.settle(() => err('down'), { key: 'k' }), ok('fresh'))
+      assert.deepEqual(
+        await policy.settle(() => Result.err('down'), { key: 'k' }),
+        Result.ok('fresh'),
+      )
       assert.deepEqual(unhandled, [])
     } finally {
       process.off('unhandledRejection', onUnhandled)

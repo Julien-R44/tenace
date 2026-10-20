@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Tenace } from '../src/tenace.ts'
 import { NotFound } from './helpers/strategies.ts'
 
@@ -15,7 +15,7 @@ test.group('Batch | Tenace.all', () => {
         return 'slow'
       },
       () => 'fast',
-      () => ok(3),
+      () => Result.ok(3),
     ]).execute()
     assert.deepEqual(values, ['slow', 'fast', 3])
   })
@@ -54,13 +54,13 @@ test.group('Batch | Tenace.all', () => {
     const notFound = new NotFound('x')
     const results = await Tenace.all([
       () => 1,
-      () => err(notFound),
+      () => Result.err(notFound),
       () => {
         throw new Error('raw')
       },
     ]).settle()
-    assert.deepEqual(results[0], ok(1))
-    assert.deepEqual(results[1], err(notFound))
+    assert.deepEqual(results[0], Result.ok(1))
+    assert.deepEqual(results[1], Result.err(notFound))
     assert.isTrue(!results[2].ok && results[2].error instanceof UnexpectedError)
   })
 
@@ -68,7 +68,7 @@ test.group('Batch | Tenace.all', () => {
     const calls = [0, 0]
     const policy = Tenace.policy().withRetry({ retries: 2, delay: 0 })
     const values = await Tenace.all(
-      [() => (++calls[0]! < 3 ? err('retry me') : 'a'), () => (++calls[1]!, 'b')],
+      [() => (++calls[0]! < 3 ? Result.err('retry me') : 'a'), () => (++calls[1]!, 'b')],
       { policy },
     ).execute()
     assert.deepEqual(values, ['a', 'b'])
@@ -109,7 +109,7 @@ test.group('Batch | Tenace.all', () => {
 
   test('policy.isError recognizes known errors rejected by a batch', async ({ assert }) => {
     const policy = Tenace.policy()
-    const thrown = await Tenace.all([() => err(new NotFound('x'))], { policy })
+    const thrown = await Tenace.all([() => Result.err(new NotFound('x'))], { policy })
       .execute()
       .catch((error: unknown) => error)
     assert.isTrue(policy.isError(thrown))
@@ -149,8 +149,8 @@ test.group('Batch | Tenace.map', () => {
 
   test('accepts any iterable and settles every item', async ({ assert }) => {
     const results = await Tenace.map(new Set([1, 2]), item =>
-      item === 2 ? err('two') : item * 10,
+      item === 2 ? Result.err('two') : item * 10,
     ).settle()
-    assert.deepEqual(results, [ok(10), err('two')])
+    assert.deepEqual(results, [Result.ok(10), Result.err('two')])
   })
 })

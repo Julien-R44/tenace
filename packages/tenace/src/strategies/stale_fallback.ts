@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
-import { type AnyResult, ok } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface StaleFallbackOptions {
@@ -41,7 +41,7 @@ export class StaleFallback extends Strategy {
     }
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key
     if (key === undefined) {
       throw new TypeError(
@@ -62,6 +62,6 @@ export class StaleFallback extends Strategy {
     const stale = this.#values.get(key)
     if (!stale || context.signal.aborted || now - stale.at > this.#maxAgeMs) return result
     context.emit({ type: 'fallback.stale', key, ageMs: now - stale.at })
-    return ok(stale.value)
+    return Result.ok(stale.value)
   }
 }

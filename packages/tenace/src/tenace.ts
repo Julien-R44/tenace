@@ -8,7 +8,7 @@ import {
 } from './internal/global_instrumentation.ts'
 import { Chaos, type ChaosOptions } from './strategies/chaos.ts'
 import { type Fn, Policy, type PolicyOptions, type ReusablePolicy } from './policy.ts'
-import type { Result } from './result/core.ts'
+import type { Result } from './result/namespace.ts'
 import type { AnyOp } from './strategy.ts'
 import { waitFor } from './wait_for.ts'
 

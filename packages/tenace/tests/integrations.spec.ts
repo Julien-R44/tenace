@@ -3,7 +3,7 @@ import { test } from '@japa/runner'
 import { ExecutionContext } from '../src/context.ts'
 import { LockNotAcquiredError, RateLimitError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import type { CacheProvider } from '../src/strategies/cache.ts'
 import { Dedupe } from '../src/strategies/dedupe.ts'
 import { Lock, type LockProvider, MemoryLockProvider } from '../src/strategies/lock.ts'
@@ -32,15 +32,15 @@ test.group('RateLimit', () => {
   test('allows `limit` calls per window, then rejects with retryAfterMs', async ({ assert }) => {
     const clock = new TestClock()
     const policy = Tenace.policy().withRateLimit({ limit: 2, per: '1s', clock })
-    assert.deepEqual(await policy.settle(() => 1), ok(1))
-    assert.deepEqual(await policy.settle(() => 2), ok(2))
+    assert.deepEqual(await policy.settle(() => 1), Result.ok(1))
+    assert.deepEqual(await policy.settle(() => 2), Result.ok(2))
 
     const rejected = await policy.settle(() => 3)
     assert.isTrue(!rejected.ok && rejected.error instanceof RateLimitError)
     assert.equal((rejected as { error: RateLimitError }).error.retryAfterMs, 500)
 
     await clock.advance(500)
-    assert.deepEqual(await policy.settle(() => 4), ok(4))
+    assert.deepEqual(await policy.settle(() => 4), Result.ok(4))
   })
 
   test('counts each key separately', async ({ assert }) => {
@@ -56,7 +56,7 @@ test.group('RateLimit', () => {
     await policy.settle(() => 1, { clock })
     const waiting = policy.settle(() => clock.now(), { clock })
     await clock.advance(100)
-    assert.deepEqual(await waiting, ok(100))
+    assert.deepEqual(await waiting, Result.ok(100))
   })
 
   test('waits on its own clock when it has one', async ({ assert }) => {
@@ -66,7 +66,7 @@ test.group('RateLimit', () => {
     const waiting = policy.settle(() => clock.now())
     await clock.advance('1m')
     const late = new Promise(resolve => setTimeout(resolve, 50, 'still waiting'))
-    assert.deepEqual(await Promise.race([waiting, late]), ok(60_000))
+    assert.deepEqual(await Promise.race([waiting, late]), Result.ok(60_000))
   })
 
   test('an outer retry waits retryAfterMs', async ({ assert }) => {
@@ -77,7 +77,7 @@ test.group('RateLimit', () => {
     await policy.settle(() => 'first', { clock })
     const retried = policy.settle(() => clock.now(), { clock })
     await clock.advance(1000)
-    assert.deepEqual(await retried, ok(1000))
+    assert.deepEqual(await retried, Result.ok(1000))
   })
 
   test('a shared store limits every policy using it', async ({ assert }) => {
@@ -170,11 +170,11 @@ test.group('RateLimit', () => {
     await policy.settle(() => 1, { clock })
     const waiting = policy.settle(() => clock.now(), { clock })
     await clock.advance(100)
-    assert.deepEqual(await waiting, ok(100))
+    assert.deepEqual(await waiting, Result.ok(100))
 
     const controller = new AbortController()
     const context = new ExecutionContext({ signal: controller.signal, clock })
-    const aborted = limit.execute(context, async () => ok('never'))
+    const aborted = limit.execute(context, async () => Result.ok('never'))
     await tick()
     controller.abort('gave up')
     const result = await aborted
@@ -247,7 +247,7 @@ test.group('Lock', () => {
 
   test('uses the execution key and requires one', async ({ assert }) => {
     const policy = Tenace.policy().withLock()
-    assert.deepEqual(await policy.settle(() => 1, { key: 'k' }), ok(1))
+    assert.deepEqual(await policy.settle(() => 1, { key: 'k' }), Result.ok(1))
     await assert.rejects(() => policy.settle(() => 1), /needs a key/)
   })
 
@@ -325,7 +325,7 @@ test.group('Lock', () => {
       await Tenace.policy()
         .withLock({ provider: leaky, key: 'k' })
         .settle(() => 1),
-      ok(1),
+      Result.ok(1),
     )
   })
 })
@@ -404,7 +404,10 @@ test.group('Cache', () => {
     const policy = Tenace.policy({ instrumentation }).withCache({ provider })
     let calls = 0
 
-    assert.deepEqual(await policy.settle(() => err('nope'), { key: 'k' }), err('nope'))
+    assert.deepEqual(
+      await policy.settle(() => Result.err('nope'), { key: 'k' }),
+      Result.err('nope'),
+    )
     assert.equal(await policy.execute(() => ++calls, { key: 'k' }), 1)
     assert.equal(await policy.execute(() => ++calls, { key: 'k' }), 1)
     assert.equal(calls, 1)
@@ -454,8 +457,8 @@ test.group('Cache', () => {
     }
     const result = await Tenace.policy()
       .withCache({ provider: servesStale, key: 'k' })
-      .settle(() => err('down'))
-    assert.deepEqual(result, ok('stale'))
+      .settle(() => Result.err('down'))
+    assert.deepEqual(result, Result.ok('stale'))
     assert.instanceOf(thrown[0], Error)
   })
 
@@ -499,9 +502,9 @@ test.group('StaleFallback', () => {
     assert.equal(await policy.execute(() => 'fresh', { key: 'a', clock }), 'fresh')
 
     await clock.advance(1000)
-    assert.equal(await policy.execute(() => err('down'), { key: 'a', clock }), 'fresh')
+    assert.equal(await policy.execute(() => Result.err('down'), { key: 'a', clock }), 'fresh')
     assert.deepEqual(events, [{ type: 'fallback.stale', key: 'a', ageMs: 1000 }])
-    await assert.rejects(() => policy.execute(() => err('down'), { key: 'b', clock }))
+    await assert.rejects(() => policy.execute(() => Result.err('down'), { key: 'b', clock }))
   })
 
   test('needs a key, so a value is never served to another function', async ({ assert }) => {
@@ -514,11 +517,14 @@ test.group('StaleFallback', () => {
     const policy = Tenace.policy().withStaleFallback({ maxAge: 100, maxEntries: 1 })
     await policy.execute(() => 'a', { key: 'a', clock })
     await clock.advance(101)
-    assert.isFalse((await policy.settle(() => err('down'), { key: 'a', clock })).ok)
+    assert.isFalse((await policy.settle(() => Result.err('down'), { key: 'a', clock })).ok)
 
     await policy.execute(() => 'a', { key: 'a', clock })
     await policy.execute(() => 'b', { key: 'b', clock })
-    assert.isFalse((await policy.settle(() => err('down'), { key: 'a', clock })).ok)
-    assert.deepEqual(await policy.settle(() => err('down'), { key: 'b', clock }), ok('b'))
+    assert.isFalse((await policy.settle(() => Result.err('down'), { key: 'a', clock })).ok)
+    assert.deepEqual(
+      await policy.settle(() => Result.err('down'), { key: 'b', clock }),
+      Result.ok('b'),
+    )
   })
 })

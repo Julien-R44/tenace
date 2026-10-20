@@ -4,7 +4,7 @@ import { type Duration, toMs } from '../duration.ts'
 import { RateLimitError, UnexpectedError } from '../errors.ts'
 import { sleep } from '../internal/sleep.ts'
 import type { MaybePromise } from '../internal/types.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface RateLimitDecision {
@@ -140,7 +140,7 @@ export class RateLimit extends Strategy<RateLimitError> {
     this.#clock = options.clock
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key ?? 'default'
     const clock = this.#clock ?? context.clock
     const deadline = clock.now() + this.#maxWaitMs
@@ -150,7 +150,7 @@ export class RateLimit extends Strategy<RateLimitError> {
       try {
         decision = await this.#store.consume(key, clock.now())
       } catch (error) {
-        return err(new UnexpectedError(error))
+        return Result.err(new UnexpectedError(error))
       }
       if (decision.allowed) return next(context)
 
@@ -162,10 +162,10 @@ export class RateLimit extends Strategy<RateLimitError> {
         clock.now() + retryAfterMs > deadline
       ) {
         context.emit({ type: 'rate_limit.rejected', key, retryAfterMs })
-        return err(new RateLimitError(key, retryAfterMs))
+        return Result.err(new RateLimitError(key, retryAfterMs))
       }
       if (!(await sleep(clock, retryAfterMs, context.signal))) {
-        return err(new UnexpectedError(context.signal.reason))
+        return Result.err(new UnexpectedError(context.signal.reason))
       }
     }
   }

@@ -1,7 +1,7 @@
 import { TenaceError, type TimeoutError, type UnexpectedError } from '../../src/errors.ts'
 import type { OtherError } from '../../src/fold.ts'
 import type { ErrorOf } from '../../src/policy.ts'
-import { err, ok, type Result } from '../../src/result/core.ts'
+import { Result } from '../../src/result/namespace.ts'
 import { Tenace } from '../../src/tenace.ts'
 import { Explode, NotFound, type BoomError } from '../helpers/strategies.ts'
 import { type Equal, expectType } from './helpers.ts'
@@ -108,15 +108,15 @@ expectType<Equal<typeof s3b, Result<User | null, AErr | BErr | UnexpectedError>>
 /* ---- handlers returning Results ---- */
 const toErr = Tenace.policy()
   .withTimeout(10)
-  .withFallbackOn(['TimeoutError'], () => err(new NotFound('x')))
+  .withFallbackOn(['TimeoutError'], () => Result.err(new NotFound('x')))
 expectType<Equal<ErrorOf<typeof toErr>, UnexpectedError | NotFound>>()
 const toOk = Tenace.policy()
   .withTimeout(10)
-  .withFallbackOn(['TimeoutError'], async () => ok('cached' as const))
+  .withFallbackOn(['TimeoutError'], async () => Result.ok('cached' as const))
 const v4 = await toOk.execute(fetchUser)
 expectType<Equal<typeof v4, User | 'cached'>>()
 const mixed = Tenace.policy().withFallback(() =>
-  Math.random() > 0.5 ? ok(1) : err(new NotFound('x')),
+  Math.random() > 0.5 ? Result.ok(1) : Result.err(new NotFound('x')),
 )
 const s5 = await mixed.settle(fetchUser)
 expectType<Equal<typeof s5, Result<User | number, NotFound>>>()
@@ -124,7 +124,7 @@ expectType<Equal<typeof s5, Result<User | number, NotFound>>>()
 // re-raising an undeclared error keeps the errors of the function
 const reRaised = Tenace.policy()
   .withTimeout(10)
-  .withFallback(error => (error._tag === 'TimeoutError' ? ok(null) : err(error)))
+  .withFallback(error => (error._tag === 'TimeoutError' ? Result.ok(null) : Result.err(error)))
 const s5b = await reRaised.settle(findUser)
 expectType<Equal<typeof s5b, Result<User | null, NotFound | UnexpectedError | TimeoutError>>>()
 

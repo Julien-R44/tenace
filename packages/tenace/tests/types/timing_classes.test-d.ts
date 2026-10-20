@@ -1,6 +1,6 @@
 import { TimeoutError, type UnexpectedError } from '../../src/errors.ts'
 import type { ErrorOf } from '../../src/policy.ts'
-import { err, type Result } from '../../src/result/core.ts'
+import { Result } from '../../src/result/namespace.ts'
 import { Fallback, MapError } from '../../src/strategies/fallback.ts'
 import { Retry } from '../../src/strategies/retry.ts'
 import { Tenace } from '../../src/tenace.ts'
@@ -23,7 +23,7 @@ const value = await caught.settle(() => 'x')
 expectType<Equal<typeof value, Result<string | number, never>>>()
 
 // errors returned by the handler are added
-const failing = base.with(new Fallback(() => err(new NotFound('x'))))
+const failing = base.with(new Fallback(() => Result.err(new NotFound('x'))))
 expectType<Equal<ErrorOf<typeof failing>, NotFound>>()
 
 // a type guard removes the guarded errors, a plain predicate removes nothing

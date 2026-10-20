@@ -1,5 +1,5 @@
 import { UnexpectedError } from '../errors.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 
 interface Waiters {
   readonly callbacks: Set<() => void>
@@ -67,10 +67,10 @@ export function raceAbort<T>(start: () => Promise<T>, signal: AbortSignal): Prom
  * Resolves like `promise`, or with an `UnexpectedError` wrapping the abort reason as soon as
  * the signal aborts. Never rejects if `promise` never rejects.
  */
-export function raceSignal(promise: Promise<AnyResult>, signal: AbortSignal): Promise<AnyResult> {
-  if (signal.aborted) return Promise.resolve(err(new UnexpectedError(signal.reason)))
+export function raceSignal(promise: Promise<Result.Any>, signal: AbortSignal): Promise<Result.Any> {
+  if (signal.aborted) return Promise.resolve(Result.err(new UnexpectedError(signal.reason)))
   return new Promise((resolve, reject) => {
-    const cancel = onAbort(signal, () => resolve(err(new UnexpectedError(signal.reason))))
+    const cancel = onAbort(signal, () => resolve(Result.err(new UnexpectedError(signal.reason))))
     promise.then(
       result => {
         cancel()

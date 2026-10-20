@@ -3,7 +3,7 @@ import { test } from '@japa/runner'
 import { backoff } from '../src/backoff.ts'
 import { CircuitOpenError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import type { CircuitState } from '../src/strategies/circuit_breaker/machine.ts'
 import {
@@ -66,10 +66,10 @@ test.group('CircuitBreaker | closed and open', () => {
     assert.equal(breaker.state, 'closed')
   })
 
-  test('err() results count as failures', async ({ assert }) => {
+  test('Result.err() results count as failures', async ({ assert }) => {
     const { breaker, policy } = setup()
-    await policy.settle(() => err('nope'))
-    await policy.settle(() => err('nope'))
+    await policy.settle(() => Result.err('nope'))
+    await policy.settle(() => Result.err('nope'))
     assert.equal(breaker.state, 'open')
   })
 
@@ -99,7 +99,7 @@ test.group('CircuitBreaker | half-open', () => {
     assert.equal((rejected as { error: CircuitOpenError }).error.state, 'half-open')
 
     probe.resolve('recovered')
-    assert.deepEqual(await trial, ok('recovered'))
+    assert.deepEqual(await trial, Result.ok('recovered'))
     assert.equal(breaker.state, 'closed')
   })
 
@@ -256,7 +256,7 @@ test.group('CircuitBreaker | classification', () => {
     await policy.settle(fail)
     await clock.advance(1000)
     await buggy.settle(fail).catch(() => {})
-    assert.deepEqual(await policy.settle(succeed), ok('up'))
+    assert.deepEqual(await policy.settle(succeed), Result.ok('up'))
     assert.equal(breaker.state, 'closed')
   })
 })
@@ -276,7 +276,7 @@ test.group('CircuitBreaker | isolate and events', () => {
     assert.equal(breaker.state, 'isolated')
     await releaseB()
     assert.equal(breaker.state, 'closed')
-    assert.deepEqual(await policy.settle(succeed), ok('up'))
+    assert.deepEqual(await policy.settle(succeed), Result.ok('up'))
   })
 
   test('an onStateChange that throws is reported and keeps the result of the call', async ({
@@ -423,7 +423,7 @@ test.group('CircuitBreaker | isolate and events', () => {
 
     await clock.advance(10)
     await clock.advance(1000)
-    assert.deepEqual(await settled, ok('recovered'))
+    assert.deepEqual(await settled, Result.ok('recovered'))
     assert.equal(calls, 3)
     assert.equal(breaker.state, 'closed')
   })
@@ -501,8 +501,8 @@ test.group('CircuitBreaker | store and options', () => {
           store: failing(failed),
           onStateChange: () => {},
         })
-        assert.deepEqual(await policy.settle(succeed), ok('up'), failed)
-        assert.deepEqual(await policy.settle(() => err('nope')), err('nope'), failed)
+        assert.deepEqual(await policy.settle(succeed), Result.ok('up'), failed)
+        assert.deepEqual(await policy.settle(() => Result.err('nope')), Result.err('nope'), failed)
       }
       await new Promise(resolve => setTimeout(resolve, 0))
       assert.isNotEmpty(reported)
@@ -566,7 +566,7 @@ test.group('CircuitBreaker | store and options', () => {
     await policy.settle(fail)
     assert.equal(await breaker.getState(), 'open')
     await clock.advance(1000)
-    assert.deepEqual(await policy.settle(succeed), ok('up'))
+    assert.deepEqual(await policy.settle(succeed), Result.ok('up'))
     assert.equal(await breaker.getState(), 'closed')
   })
 

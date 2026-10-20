@@ -2,7 +2,7 @@ import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { BulkheadFullError, UnexpectedError } from '../errors.ts'
 import { Scheduler } from '../internal/scheduler.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface BulkheadOptions {
@@ -71,21 +71,21 @@ export class Bulkhead extends Strategy<BulkheadFullError> {
     return this.#scheduler.queued
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const release = await this.#scheduler.acquire({
       ...(context.abortable && { signal: context.signal }),
       clock: context.clock,
       ...(this.#maxWaitMs !== undefined && { maxWaitMs: this.#maxWaitMs }),
     })
     if (!release) {
-      if (context.signal.aborted) return err(new UnexpectedError(context.signal.reason))
+      if (context.signal.aborted) return Result.err(new UnexpectedError(context.signal.reason))
       const { running, queued } = this.#scheduler
       context.emit({ type: 'bulkhead.rejected', bulkhead: this.name, running, queued })
-      return err(new BulkheadFullError(running, queued))
+      return Result.err(new BulkheadFullError(running, queued))
     }
 
     try {
-      if (context.signal.aborted) return err(new UnexpectedError(context.signal.reason))
+      if (context.signal.aborted) return Result.err(new UnexpectedError(context.signal.reason))
       return await next(context)
     } finally {
       release()

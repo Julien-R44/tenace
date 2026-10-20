@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { TimeoutError } from '../src/errors.ts'
 import { systemClock } from '../src/clock.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Timeout } from '../src/strategies/timeout.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
@@ -63,7 +63,7 @@ test.group('Timeout | aggressive', () => {
     const result = await Tenace.policy()
       .withTimeout('1s')
       .settle(() => 'fast', { clock })
-    assert.deepEqual(result, ok('fast'))
+    assert.deepEqual(result, Result.ok('fast'))
     assert.equal(clock.pendingTimers, 0)
   })
 
@@ -124,9 +124,12 @@ test.group('Timeout | aggressive', () => {
           throw bug
         })
         .withTimeout(10)
-        .settle(() => new Promise(resolve => clock.setTimeout(() => resolve(err('late')), 20)), {
-          clock,
-        })
+        .settle(
+          () => new Promise(resolve => clock.setTimeout(() => resolve(Result.err('late')), 20)),
+          {
+            clock,
+          },
+        )
       await clock.advance(10)
       const result = await settled
       assert.instanceOf(!result.ok && result.error, TimeoutError)
@@ -146,7 +149,7 @@ test.group('Timeout | aggressive', () => {
         },
         { clock },
       )
-    assert.deepEqual(result, ok(false))
+    assert.deepEqual(result, Result.ok(false))
   })
 
   test('rejects invalid durations when the policy is built', ({ assert }) => {
@@ -197,7 +200,7 @@ test.group('Timeout | cooperative', () => {
         { clock },
       )
     await clock.advance(150)
-    assert.deepEqual(await settled, ok(true))
+    assert.deepEqual(await settled, Result.ok(true))
   })
 })
 

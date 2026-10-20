@@ -1,10 +1,10 @@
 import type { ExecutionContext } from '../context.ts'
 import { raceSignal } from '../internal/race_signal.ts'
-import type { AnyResult } from '../result/core.ts'
+import type { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 interface InFlight {
-  readonly promise: Promise<AnyResult>
+  readonly promise: Promise<Result.Any>
   readonly controller: AbortController
   waiters: number
 }
@@ -43,7 +43,7 @@ export class Dedupe extends Strategy {
     return this.#inFlight.size
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key
     if (key === undefined) {
       throw new TypeError('Dedupe needs a key: pass `key` to the dedupe or to execute(fn, { key })')

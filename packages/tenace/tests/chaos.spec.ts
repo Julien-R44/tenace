@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ChaosError, TenaceError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Chaos } from '../src/strategies/chaos.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
@@ -30,13 +30,13 @@ test.group('Chaos', () => {
       await Tenace.policy()
         .withChaos({ error: () => injected })
         .settle(() => 1),
-      err(injected),
+      Result.err(injected),
     )
     assert.deepEqual(
       await Tenace.policy()
         .withChaos({ value: () => 'canned' })
         .settle(() => 1),
-      ok('canned'),
+      Result.ok('canned'),
     )
     const boom = new Error('boom')
     await assert.rejects(
@@ -149,7 +149,7 @@ test.group('Idempotency', () => {
     const events: TenaceEvent[] = []
     await Tenace.policy({ instrumentation: listener(event => events.push(event)) })
       .withRetry({ retries: 3, delay: 0, retryIf: () => false })
-      .settle(() => err('fatal'), { idempotent: false })
+      .settle(() => Result.err('fatal'), { idempotent: false })
     assert.notInclude(
       events.map(event => event.type),
       'retry.declined',
@@ -162,12 +162,12 @@ test.group('Idempotency', () => {
     const policy = Tenace.policy<Injected>()
       .with(breaker)
       .withRetry({ retries: 1, delay: 0, retryOn: ['CircuitOpenError', 'Injected'] })
-    await policy.settle(() => err(new Injected('down')), { clock })
+    await policy.settle(() => Result.err(new Injected('down')), { clock })
 
     let calls = 0
     const settled = policy.settle(() => ++calls, { clock, idempotent: false })
     await clock.advance(100)
-    assert.deepEqual(await settled, ok(1))
+    assert.deepEqual(await settled, Result.ok(1))
 
     const strict = Tenace.policy<Injected>()
       .with(breaker)
@@ -180,19 +180,19 @@ test.group('Idempotency', () => {
     // the failure itself is not retried, the rejection by the open circuit is
     let strictCalls = 0
     const down = new Injected('down')
-    const failed = await strict.settle(() => (strictCalls++, err(down)), { clock })
-    assert.deepEqual(failed, err(down))
+    const failed = await strict.settle(() => (strictCalls++, Result.err(down)), { clock })
+    assert.deepEqual(failed, Result.err(down))
     assert.equal(strictCalls, 1)
     const retried = strict.settle(() => 'x', { clock })
     await clock.advance(100)
-    assert.deepEqual(await retried, ok('x'))
+    assert.deepEqual(await retried, Result.ok('x'))
   })
 
   test('the retry option overrides the execution option', async ({ assert }) => {
     let calls = 0
     await Tenace.policy()
       .withRetry({ retries: 2, delay: 0, idempotent: true })
-      .settle(() => (calls++, err('x')), { idempotent: false })
+      .settle(() => (calls++, Result.err('x')), { idempotent: false })
     assert.equal(calls, 3)
   })
 })

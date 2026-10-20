@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import type { ExecutionContext } from '../src/context.ts'
 import type { ExecutionScope, Instrumentation, TenaceEvent } from '../src/instrumentation.ts'
-import { type AnyResult, err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { type Next, Strategy } from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
 
@@ -28,7 +28,7 @@ async function reporting(fn: () => Promise<void>): Promise<unknown[]> {
 
 function counted() {
   let calls = 0
-  return { fn: () => ok(++calls), calls: () => calls }
+  return { fn: () => Result.ok(++calls), calls: () => calls }
 }
 
 test.group('Instrumentation | contract', () => {
@@ -92,14 +92,17 @@ test.group('Instrumentation | contract', () => {
     const lies: Instrumentation = {
       async execution(_info, run) {
         await run(scope)
-        return err('fake')
+        return Result.err('fake')
       },
     }
     const { fn, calls } = counted()
     const reported = await reporting(async () => {
       assert.equal(await Tenace.policy({ instrumentation: throwsBefore }).execute(fn), 1)
-      assert.deepEqual(await Tenace.policy({ instrumentation: throwsAfter }).settle(fn), ok(2))
-      assert.deepEqual(await Tenace.policy({ instrumentation: lies }).settle(fn), ok(3))
+      assert.deepEqual(
+        await Tenace.policy({ instrumentation: throwsAfter }).settle(fn),
+        Result.ok(2),
+      )
+      assert.deepEqual(await Tenace.policy({ instrumentation: lies }).settle(fn), Result.ok(3))
     })
     assert.equal(calls(), 3)
     assert.deepEqual(reported, [before, after])
@@ -107,7 +110,7 @@ test.group('Instrumentation | contract', () => {
 
   test('an instrumentation that settles without calling run is reported', async ({ assert }) => {
     const { fn, calls } = counted()
-    const instrumentation: Instrumentation = { execution: async () => ok('skipped') }
+    const instrumentation: Instrumentation = { execution: async () => Result.ok('skipped') }
     const reported = await reporting(async () => {
       assert.equal(await Tenace.policy({ instrumentation }).execute(fn), 1)
     })
@@ -133,7 +136,7 @@ test.group('Instrumentation | contract', () => {
     const reported = await reporting(async () => {
       const value = await Tenace.policy({ instrumentation })
         .withRetry({ retries: 2, delay: 0 })
-        .execute(() => (++attempts < 3 ? err('again') : ok('done')))
+        .execute(() => (++attempts < 3 ? Result.err('again') : Result.ok('done')))
       assert.equal(value, 'done')
     })
     assert.equal(attempts, 3)
@@ -145,7 +148,7 @@ test.group('Instrumentation | contract', () => {
     let last: ExecutionContext | undefined
     class Keep extends Strategy {
       readonly name = 'keep'
-      execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+      execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
         last = context
         return next(context)
       }
@@ -182,7 +185,7 @@ test.group('Instrumentation | contract', () => {
       .withDedupe()
     const controller = new AbortController()
     let calls = 0
-    const fn = () => (++calls, err('nope'))
+    const fn = () => (++calls, Result.err('nope'))
     // A leads the shared run, B joins it, then A aborts: the run keeps going for B
     const a = policy.settle(fn, { signal: controller.signal, key: 'k' })
     const b = policy.settle(fn, { key: 'k' })

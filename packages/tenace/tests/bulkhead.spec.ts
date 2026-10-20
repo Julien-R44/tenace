@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ExecutionContext } from '../src/context.ts'
 import { BulkheadFullError, UnexpectedError } from '../src/errors.ts'
-import { type AnyResult, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Bulkhead } from '../src/strategies/bulkhead.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
@@ -51,7 +51,7 @@ test.group('Bulkhead', () => {
 
     await calls.releaseNext()
     await calls.releaseNext()
-    assert.deepEqual(await Promise.all([a, b]), [ok(1), ok(2)])
+    assert.deepEqual(await Promise.all([a, b]), [Result.ok(1), Result.ok(2)])
     assert.equal(bulkhead.running, 0)
   })
 
@@ -70,7 +70,7 @@ test.group('Bulkhead', () => {
     assert.deepEqual(calls.started, [1, 2])
     await calls.releaseNext()
     await calls.releaseNext()
-    assert.deepEqual(await Promise.all(results), [ok(1), ok(2), ok(3)])
+    assert.deepEqual(await Promise.all(results), [Result.ok(1), Result.ok(2), Result.ok(3)])
     assert.equal(bulkhead.queued, 0)
     assert.equal(bulkhead.running, 0)
   })
@@ -88,7 +88,7 @@ test.group('Bulkhead', () => {
     assert.deepEqual(calls.started, [1])
 
     await calls.releaseNext()
-    assert.deepEqual(await first, ok(1))
+    assert.deepEqual(await first, Result.ok(1))
     assert.equal(clock.pendingTimers, 0)
   })
 
@@ -109,14 +109,14 @@ test.group('Bulkhead', () => {
     await calls.releaseNext()
     assert.deepEqual(calls.started, [1, 2])
     await calls.releaseNext()
-    assert.deepEqual(await Promise.all([first, third]), [ok(1), ok(2)])
+    assert.deepEqual(await Promise.all([first, third]), [Result.ok(1), Result.ok(2)])
   })
 
   test('a call aborted in the tick its slot is granted does not run', async ({ assert }) => {
     const bulkhead = new Bulkhead({ concurrency: 1, queue: 1 })
     const controller = new AbortController()
     let finish!: () => void
-    const holding = new Promise<AnyResult>(resolve => (finish = () => resolve(ok('done'))))
+    const holding = new Promise<Result.Any>(resolve => (finish = () => resolve(Result.ok('done'))))
     const holder = bulkhead.execute(
       new ExecutionContext({ signal: new AbortController().signal }),
       () => holding,
@@ -126,7 +126,7 @@ test.group('Bulkhead', () => {
       new ExecutionContext({ signal: controller.signal }),
       async () => {
         called = true
-        return ok('ran')
+        return Result.ok('ran')
       },
     )
 

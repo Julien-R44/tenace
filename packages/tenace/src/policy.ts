@@ -17,8 +17,7 @@ import type {
   OtherError,
   ValueOfReturn,
 } from './fold.ts'
-import { type AnyResult, err, type Result } from './result/core.ts'
-import { toResult } from './result/registry.ts'
+import { Result } from './result/namespace.ts'
 import { combine, type Attributes, type Instrumentation, withoutGlobal } from './instrumentation.ts'
 import { guardInstrumentation } from './internal/core_instrumentation.ts'
 import { diagnosticsChannel } from './internal/diagnostics_channel.ts'
@@ -478,10 +477,11 @@ export class Policy<
   ): Promise<BoundValue<Bound> | TAdd>
   async execute(...args: unknown[]): Promise<unknown> {
     const result = await this.#runWith(args)
-    if (result.ok) return result.value
-    if (result.error instanceof UnexpectedError) throw result.error.cause
-    if (typeof result.error === 'object' && result.error !== null) this.#rejected.add(result.error)
-    throw result.error
+    const known = !result.ok && !(result.error instanceof UnexpectedError)
+    if (known && typeof result.error === 'object' && result.error !== null) {
+      this.#rejected.add(result.error)
+    }
+    return Result.unwrap(result)
   }
 
   /**
@@ -500,7 +500,7 @@ export class Policy<
     this: Policy<Ops, TAdd, EIn, Fn>,
     options?: ExecuteOptions,
   ): Promise<Result<BoundValue<Bound> | TAdd, Fold<BoundError<Bound>, Ops>>>
-  settle(...args: unknown[]): Promise<AnyResult> {
+  settle(...args: unknown[]): Promise<Result.Any> {
     return this.#runWith(args)
   }
 
@@ -530,7 +530,7 @@ export class Policy<
     return new Policy([...this.#strategies, strategy], this.#bound, this.#options) as P
   }
 
-  #runWith(args: unknown[]): Promise<AnyResult> {
+  #runWith(args: unknown[]): Promise<Result.Any> {
     if (this.#bound) return this.#run(this.#bound, args[0] as ExecuteOptions | undefined)
     if (typeof args[0] !== 'function') {
       return Promise.reject(
@@ -540,7 +540,7 @@ export class Policy<
     return this.#run(args[0] as Fn, args[1] as ExecuteOptions | undefined)
   }
 
-  async #run(fn: Fn, options: ExecuteOptions | undefined): Promise<AnyResult> {
+  async #run(fn: Fn, options: ExecuteOptions | undefined): Promise<Result.Any> {
     const signal = options?.signal
     signal?.throwIfAborted()
 
@@ -554,11 +554,11 @@ export class Policy<
     })
     const chain = this.#chain(fn)
     // the abort is raced inside the instrumented run, so instrumentations see it
-    const start = (inner: ExecutionContext): Promise<AnyResult> =>
+    const start = (inner: ExecutionContext): Promise<Result.Any> =>
       signal ? raceAbort(() => chain(inner), signal) : chain(inner)
     const instrumentation = this.#instrumentation()
     if (!instrumentation) return start(context)
-    const observed = (): Promise<AnyResult> =>
+    const observed = (): Promise<Result.Any> =>
       instrumentation.execution(
         {
           name: options?.name ?? this.#options.name ?? 'tenace',
@@ -612,10 +612,6 @@ export class Policy<
 /**
  * The boundary with user code: never rejects.
  */
-async function runSource(fn: Fn, context: ExecutionContext): Promise<AnyResult> {
-  try {
-    return toResult(await fn(context))
-  } catch (thrown) {
-    return err(new UnexpectedError(thrown))
-  }
+async function runSource(fn: Fn, context: ExecutionContext): Promise<Result.Any> {
+  return Result.try(() => fn(context))
 }

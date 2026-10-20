@@ -1,7 +1,6 @@
 import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result/core.ts'
 import { Result } from '../src/result/index.ts'
 import { registerResult, unregisterResult } from '../src/result/registry.ts'
 import { Tenace } from '../src/tenace.ts'
@@ -14,9 +13,9 @@ test.group('Result registry', group => {
   const registerApp = () =>
     registerResult('app', value =>
       value instanceof AppOk
-        ? ok(value.data)
+        ? Result.ok(value.data)
         : value instanceof AppErr
-          ? err(value.failure)
+          ? Result.err(value.failure)
           : undefined,
     )
 
@@ -25,7 +24,10 @@ test.group('Result registry', group => {
     const notFound = new NotFound('x')
 
     assert.equal(await Tenace.policy().execute(() => new AppOk(1)), 1)
-    assert.deepEqual(await Tenace.policy().settle(async () => new AppErr(notFound)), err(notFound))
+    assert.deepEqual(
+      await Tenace.policy().settle(async () => new AppErr(notFound)),
+      Result.err(notFound),
+    )
   })
 
   test('foreign results are plain values when nothing is registered', async ({ assert }) => {
@@ -53,7 +55,7 @@ test.group('Result registry', group => {
 
   test('registering again replaces the adapter, unregister removes it', async ({ assert }) => {
     registerApp()
-    registerResult('app', value => (value instanceof AppOk ? ok('replaced') : undefined))
+    registerResult('app', value => (value instanceof AppOk ? Result.ok('replaced') : undefined))
     assert.equal(await Tenace.policy().execute(() => new AppOk(1)), 'replaced')
 
     unregisterResult('app')

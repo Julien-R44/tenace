@@ -5,7 +5,7 @@ import { CircuitOpenError, UnexpectedError } from '../../errors.ts'
 import { reportError } from '../../internal/report_error.ts'
 import { isThenable } from '../../internal/thenable.ts'
 import type { MaybePromise } from '../../internal/types.ts'
-import { type AnyResult, err } from '../../result/core.ts'
+import { Result } from '../../result/namespace.ts'
 import { type Next, Strategy } from '../../strategy.ts'
 import type { Admission, BreakerConfig, CallOutcome, CircuitState, TripConfig } from './machine.ts'
 import { type CircuitBreakerStore, MemoryCircuitBreakerStore } from './store.ts'
@@ -68,7 +68,7 @@ export interface CircuitBreakerOptions {
    * `LockNotAcquiredError`), which are
    * ignored. Calls whose signal was aborted are always ignored.
    */
-  readonly classify?: ((result: AnyResult) => CallOutcome) | undefined
+  readonly classify?: ((result: Result.Any) => CallOutcome) | undefined
   /**
    * Called after each state change. An error it throws is reported with
    * `globalThis.reportError` and does not change the result of the call.
@@ -91,7 +91,7 @@ const REJECTION_TAGS: ReadonlySet<unknown> = new Set([
   'LockNotAcquiredError',
 ])
 
-function defaultClassify(result: AnyResult): CallOutcome {
+function defaultClassify(result: Result.Any): CallOutcome {
   if (result.ok) return 'success'
   return REJECTION_TAGS.has((result.error as { _tag?: unknown } | null)?._tag)
     ? 'ignored'
@@ -171,7 +171,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
   readonly config: BreakerConfig
   readonly #store: CircuitBreakerStore
   readonly #clock: Clock
-  readonly #classify: (result: AnyResult) => CallOutcome
+  readonly #classify: (result: Result.Any) => CallOutcome
   readonly #onStateChange: CircuitBreakerOptions['onStateChange']
   /**
    * Last state a tracked call saw. See `#notify`.
@@ -246,21 +246,21 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
     }
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     let admission: Admission
     try {
       const admitted = this.#store.admit(this.#clock.now(), this.config)
       // the memory store is synchronous: awaiting its values costs microtask hops on every call
       admission = isThenable(admitted) ? await admitted : admitted
     } catch (error) {
-      return err(new UnexpectedError(error))
+      return Result.err(new UnexpectedError(error))
     }
     const notified = this.#notify(context)
     if (notified) await notified
     if (!admission.admitted) {
       const { state, retryAfterMs } = admission
       context.emit({ type: 'circuit.rejected', breaker: this.name, state, retryAfterMs })
-      return err(new CircuitOpenError(state, retryAfterMs))
+      return Result.err(new CircuitOpenError(state, retryAfterMs))
     }
 
     let outcome: CallOutcome = 'ignored'

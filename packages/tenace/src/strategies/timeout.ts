@@ -4,7 +4,7 @@ import { TimeoutError } from '../errors.ts'
 import { raceSignal } from '../internal/race_signal.ts'
 import { reportError } from '../internal/report_error.ts'
 import { linkSignal } from '../internal/signal.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface TimeoutOptions {
@@ -43,24 +43,24 @@ export class Timeout extends Strategy<TimeoutError> {
     this.mode = mode
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     if (this.timeoutMs === Number.POSITIVE_INFINITY) return next(context)
 
     const link = linkSignal(context.abortable ? context.signal : undefined)
     const error = new TimeoutError(this.timeoutMs)
     let timedOut = false
-    let onDeadline: ((result: AnyResult) => void) | undefined
-    const deadline = new Promise<AnyResult>(resolve => (onDeadline = resolve))
+    let onDeadline: ((result: Result.Any) => void) | undefined
+    const deadline = new Promise<Result.Any>(resolve => (onDeadline = resolve))
 
     const handle = context.clock.setTimeout(() => {
       timedOut = true
       link.abort(error)
-      onDeadline!(err(error))
+      onDeadline!(Result.err(error))
     }, this.timeoutMs)
 
     try {
       const inner = next(context.with({ signal: link.signal }))
-      let result: AnyResult
+      let result: Result.Any
       if (this.mode === 'aggressive') {
         const raced = Promise.race([inner, deadline])
         result = await (context.abortable ? raceSignal(raced, context.signal) : raced)
@@ -72,7 +72,7 @@ export class Timeout extends Strategy<TimeoutError> {
       if (!timedOut || result.ok) return result
 
       context.emit({ type: 'timeout', attempt: context.attempt, timeoutMs: this.timeoutMs })
-      return err(error)
+      return Result.err(error)
     } finally {
       context.clock.clearTimeout(handle)
       link.dispose()

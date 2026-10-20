@@ -10,7 +10,7 @@ import {
 } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
 import { sleep } from '../src/internal/sleep.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Retry } from '../src/strategies/retry.ts'
 import { RetryBudget } from '../src/strategies/retry_budget.ts'
 import { Tenace } from '../src/tenace.ts'
@@ -90,20 +90,20 @@ test.group('Retry | attempts', () => {
     assert.lengthOf(calls, 1)
   })
 
-  test('does not retry successes, including ok() results', async ({ assert }) => {
+  test('does not retry successes, including Result.ok() results', async ({ assert }) => {
     let calls = 0
     await Tenace.policy()
       .withRetry({ retries: 3, delay: 0 })
-      .execute(() => ok(++calls))
+      .execute(() => Result.ok(++calls))
     assert.equal(calls, 1)
   })
 
-  test('retries err() results like throws', async ({ assert }) => {
+  test('retries Result.err() results like throws', async ({ assert }) => {
     let calls = 0
     const result = await Tenace.policy()
       .withRetry({ retries: 2, delay: 0 })
-      .settle(() => (++calls < 3 ? err(new NotFound('x')) : ok('found')))
-    assert.deepEqual(result, ok('found'))
+      .settle(() => (++calls < 3 ? Result.err(new NotFound('x')) : Result.ok('found')))
+    assert.deepEqual(result, Result.ok('found'))
   })
 
   test('rejects invalid retries', ({ assert }) => {
@@ -122,7 +122,7 @@ test.group('Retry | classification', () => {
       retryOn: ['NotFound'],
     })
 
-    await policy.settle(() => (++calls, err(new NotFound('x'))))
+    await policy.settle(() => (++calls, Result.err(new NotFound('x'))))
     assert.equal(calls, 6)
 
     calls = 0
@@ -156,13 +156,13 @@ test.group('Retry | classification', () => {
     let calls = 0
     await Tenace.policy<NotFound>()
       .withRetry({ retries: 5, delay: 0, retryOn: ['NotFound'], retryIf: () => false })
-      .settle(() => (++calls, err(new NotFound('x'))))
+      .settle(() => (++calls, Result.err(new NotFound('x'))))
     assert.equal(calls, 1)
   })
 
   test('retries a CircuitOpenError only when retryOn lists it', async ({ assert }) => {
     let calls = 0
-    const open = () => (++calls, err(new CircuitOpenError('open', 0)))
+    const open = () => (++calls, Result.err(new CircuitOpenError('open', 0)))
     await Tenace.policy<CircuitOpenError>()
       .withRetry({ retries: 2, delay: 0, retryIf: () => true })
       .settle(open)
@@ -177,7 +177,7 @@ test.group('Retry | classification', () => {
     calls = 0
     await Tenace.policy<BulkheadFullError>()
       .withRetry({ retries: 2, delay: 0 })
-      .settle(() => (++calls, err(new BulkheadFullError(1, 0))))
+      .settle(() => (++calls, Result.err(new BulkheadFullError(1, 0))))
     assert.equal(calls, 3)
   })
 
@@ -241,7 +241,7 @@ test.group('Retry | classification', () => {
     const times: number[] = []
     const fn = () => {
       times.push(clock.now())
-      return times.length === 1 ? err(new RateLimited(1000)) : ok('ok')
+      return times.length === 1 ? Result.err(new RateLimited(1000)) : Result.ok('ok')
     }
 
     const done = Tenace.policy().withRetry({ retries: 1, delay: 10 }).execute(fn, { clock })
@@ -269,7 +269,7 @@ test.group('Retry | classification', () => {
         maxDelay: '1s',
         onRetry: event => delays.push(event.delayMs),
       })
-      .settle(() => err(new RateLimited(3_000_000_000)), { clock })
+      .settle(() => Result.err(new RateLimited(3_000_000_000)), { clock })
     await clock.advance('2s')
     await done
     assert.deepEqual(delays, [1000, 1000])
@@ -286,7 +286,7 @@ test.group('Retry | classification', () => {
       .withRetry({ retries: 3, delay: 0 })
       .settle(() => {
         calls++
-        return err(new RateLimited(Number.POSITIVE_INFINITY))
+        return Result.err(new RateLimited(Number.POSITIVE_INFINITY))
       })
     assert.instanceOf(!result.ok && result.error, RateLimited)
     assert.equal(calls, 1)
@@ -347,7 +347,7 @@ test.group('Retry | values', () => {
     const result = await Tenace.call(fn, { instrumentation: listener(e => events.push(e)) })
       .withRetry({ retries: 2, delay: 0, retryIfValue: res => res.status === 503 })
       .settle()
-    assert.deepEqual(result, ok({ status: 503 }))
+    assert.deepEqual(result, Result.ok({ status: 503 }))
     assert.equal(calls(), 3)
     assert.deepEqual(events.at(-1), {
       type: 'retry.exhausted',
@@ -361,7 +361,7 @@ test.group('Retry | values', () => {
     let calls = 0
     const fn = () => {
       calls++
-      if (calls === 1) return err(new NotFound('x'))
+      if (calls === 1) return Result.err(new NotFound('x'))
       if (calls === 2) return { status: 503 }
       return { status: 200 }
     }
@@ -375,7 +375,7 @@ test.group('Retry | values', () => {
       })
       .settle()
     // one retry only: the 503 of the second call is returned
-    assert.deepEqual(result, ok({ status: 503 }))
+    assert.deepEqual(result, Result.ok({ status: 503 }))
     assert.deepEqual(causes, ['error'])
   })
 
@@ -405,7 +405,7 @@ test.group('Retry | values', () => {
     const result = await Tenace.call(fn, { instrumentation: listener(e => events.push(e)) })
       .withRetry({ retries: 2, delay: 0, retryIfValue: res => res.status === 503 })
       .settle({ idempotent: false })
-    assert.deepEqual(result, ok({ status: 503 }))
+    assert.deepEqual(result, Result.ok({ status: 503 }))
     assert.equal(calls(), 1)
     assert.deepEqual(events, [
       { type: 'retry.declined', attempt: 1, reason: 'idempotency', value: { status: 503 } },

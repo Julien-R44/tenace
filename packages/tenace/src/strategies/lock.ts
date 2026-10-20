@@ -3,7 +3,7 @@ import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { LockNotAcquiredError, UnexpectedError } from '../errors.ts'
 import { Scheduler } from '../internal/scheduler.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface LockLease {
@@ -132,7 +132,7 @@ export class Lock extends Strategy<LockNotAcquiredError> {
     this.#ttlMs = options.ttl === undefined ? undefined : toMs(options.ttl)
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key
     if (key === undefined) {
       throw new TypeError('Lock needs a key: pass `key` to the lock or to execute(fn, { key })')
@@ -147,16 +147,16 @@ export class Lock extends Strategy<LockNotAcquiredError> {
         clock: context.clock,
       })
     } catch (error) {
-      return err(new UnexpectedError(error))
+      return Result.err(new UnexpectedError(error))
     }
     if (!lease) {
-      if (context.signal.aborted) return err(new UnexpectedError(context.signal.reason))
+      if (context.signal.aborted) return Result.err(new UnexpectedError(context.signal.reason))
       context.emit({ type: 'lock.rejected', key })
-      return err(new LockNotAcquiredError(key))
+      return Result.err(new LockNotAcquiredError(key))
     }
 
     try {
-      if (context.signal.aborted) return err(new UnexpectedError(context.signal.reason))
+      if (context.signal.aborted) return Result.err(new UnexpectedError(context.signal.reason))
       return await next(context)
     } finally {
       try {

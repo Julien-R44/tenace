@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 
 import { TimeoutError, UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
 import { BoomError, Explode, NotFound } from './helpers/strategies.ts'
@@ -31,10 +31,10 @@ test.group('Fallback', () => {
     assert.isFalse(called)
   })
 
-  test('the handler may be async and return ok() or err()', async ({ assert }) => {
+  test('the handler may be async and return Result.ok() or Result.err()', async ({ assert }) => {
     assert.equal(
       await Tenace.policy()
-        .withFallback(async () => ok('async'))
+        .withFallback(async () => Result.ok('async'))
         .execute(fail),
       'async',
     )
@@ -42,9 +42,9 @@ test.group('Fallback', () => {
     const notFound = new NotFound('x')
     assert.deepEqual(
       await Tenace.policy()
-        .withFallback(() => err(notFound))
+        .withFallback(() => Result.err(notFound))
         .settle(fail),
-      err(notFound),
+      Result.err(notFound),
     )
   })
 
@@ -63,7 +63,7 @@ test.group('Fallback', () => {
 
     assert.equal(await policy.execute(() => 'x'), 'handled BoomError')
     const notFound = new NotFound('x')
-    assert.deepEqual(await policy.settle(() => err(notFound)), err(notFound))
+    assert.deepEqual(await policy.settle(() => Result.err(notFound)), Result.err(notFound))
   })
 
   test('withFallbackWhen handles errors matched by the guard', async ({ assert }) => {
@@ -71,7 +71,7 @@ test.group('Fallback', () => {
       error => error instanceof NotFound,
       error => `missing ${error.message}`,
     )
-    assert.equal(await policy.execute(() => err(new NotFound('user'))), 'missing user')
+    assert.equal(await policy.execute(() => Result.err(new NotFound('user'))), 'missing user')
     await assert.rejects(() => policy.execute(fail), 'down')
   })
 
@@ -125,7 +125,7 @@ test.group('mapError', () => {
       .withTimeout(1000)
       .mapError(error => (error instanceof TimeoutError ? 'timeout' : 'other'))
       .settle(fail)
-    assert.deepEqual(result, err('other'))
+    assert.deepEqual(result, Result.err('other'))
   })
 
   test('leaves successes alone', async ({ assert }) => {
@@ -133,7 +133,7 @@ test.group('mapError', () => {
       await Tenace.policy()
         .mapError(() => 'mapped')
         .settle(() => 1),
-      ok(1),
+      Result.ok(1),
     )
   })
 

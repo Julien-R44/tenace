@@ -1,6 +1,6 @@
 import { TenaceError, type UnexpectedError } from '../../src/errors.ts'
 import type { ErrorOf } from '../../src/policy.ts'
-import type { Result } from '../../src/result/core.ts'
+import type { Result } from '../../src/result/namespace.ts'
 import { Tenace } from '../../src/tenace.ts'
 import { type Equal, expectType } from './helpers.ts'
 

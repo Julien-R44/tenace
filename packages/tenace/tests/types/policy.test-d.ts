@@ -2,7 +2,7 @@ import type { Context } from '../../src/context.ts'
 import { TenaceError, type TimeoutError, type UnexpectedError } from '../../src/errors.ts'
 import type { OtherError, ValueOfReturn } from '../../src/fold.ts'
 import type { AnyPolicy, CurrentError, ErrorOf, Policy, ReusablePolicy } from '../../src/policy.ts'
-import { err, ok, type Result } from '../../src/result/core.ts'
+import { Result } from '../../src/result/namespace.ts'
 import { registerResult } from '../../src/result/registry.ts'
 import type { AnyOp, AnyStrategy, Op, Strategy } from '../../src/strategy.ts'
 import { Tenace } from '../../src/tenace.ts'
@@ -36,20 +36,20 @@ expectType<Equal<typeof s2, Result<User, NotFound | UnexpectedError>>>()
 const v2 = await base.execute(findUser)
 expectType<Equal<typeof v2, User>>()
 
-// sync functions, ok() values, unions of results
+// sync functions, Result.ok() values, unions of results
 const s3 = await base.settle(() => 1 as const)
 expectType<Equal<typeof s3, Result<1, UnexpectedError>>>()
 const s4 = await base.settle(() =>
-  Math.random() > 0.5 ? ok('a' as const) : err(new HttpError('x')),
+  Math.random() > 0.5 ? Result.ok('a' as const) : Result.err(new HttpError('x')),
 )
 expectType<Equal<typeof s4, Result<'a', HttpError | UnexpectedError>>>()
 
-// any / unknown / void / never returns (an unknown return may be any err(), an any return is a value)
+// any / unknown / void / never returns (an unknown return may be any Result.err(), an any return is a value)
 // oxlint-disable-next-line typescript/no-explicit-any
 const sAny = await base.settle((): any => 1)
 // oxlint-disable-next-line typescript/no-explicit-any
 expectType<Equal<typeof sAny, Result<any, UnexpectedError>>>()
-const sUnknown = await base.settle((): unknown => err('boom'))
+const sUnknown = await base.settle((): unknown => Result.err('boom'))
 expectType<Equal<typeof sUnknown, Result<unknown, unknown>>>()
 expectType<Equal<ErrorOf<ReturnType<typeof Tenace.call<() => unknown>>>, unknown>>()
 const sVoid = await base.settle(() => {})
@@ -140,9 +140,9 @@ base.with({ name: 'nope' })
 /* ---- registered foreign results ---- */
 registerResult('app', value =>
   value instanceof AppOk
-    ? ok(value.data)
+    ? Result.ok(value.data)
     : value instanceof AppErr
-      ? err(value.failure)
+      ? Result.err(value.failure)
       : undefined,
 )
 // @ts-expect-error the name must be declared in ResultTypes

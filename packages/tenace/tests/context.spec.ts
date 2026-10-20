@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { systemClock } from '../src/clock.ts'
 import { ExecutionContext } from '../src/context.ts'
-import { type AnyResult } from '../src/result/core.ts'
+import type { Result } from '../src/result/namespace.ts'
 import { type Next, Strategy } from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
@@ -46,7 +46,7 @@ test.group('ExecutionContext', () => {
         super()
         this.label = label
       }
-      execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+      execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
         seen.push([this.label, context.abortable])
         return next(context)
       }

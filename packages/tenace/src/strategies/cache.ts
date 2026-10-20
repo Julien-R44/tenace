@@ -1,7 +1,7 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { UnexpectedError } from '../errors.ts'
-import { type AnyResult, err, ok } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 /**
@@ -60,14 +60,14 @@ export class Cache extends Strategy {
     this.#ttlMs = options.ttl === undefined ? undefined : toMs(options.ttl)
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key
     if (key === undefined) {
       throw new TypeError('Cache needs a key: pass `key` to the cache or to execute(fn, { key })')
     }
 
-    let running: Promise<AnyResult> | undefined
-    let produced: AnyResult | undefined
+    let running: Promise<Result.Any> | undefined
+    let produced: Result.Any | undefined
     try {
       const value = await this.#provider.getOrSet(
         key,
@@ -85,13 +85,13 @@ export class Cache extends Strategy {
       } else {
         context.emit({ type: produced ? 'cache.miss' : 'cache.hit', key })
       }
-      return ok(value)
+      return Result.ok(value)
     } catch (error) {
       if (produced && !produced.ok) return produced
       context.emit({ type: 'cache.failed', key, error })
       if (running) return running
       return context.signal.aborted
-        ? err(new UnexpectedError(context.signal.reason))
+        ? Result.err(new UnexpectedError(context.signal.reason))
         : next(context)
     }
   }

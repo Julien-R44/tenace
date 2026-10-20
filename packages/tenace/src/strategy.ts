@@ -1,12 +1,12 @@
 import type { ExecutionContext } from './context.ts'
-import type { AnyResult } from './result/core.ts'
+import type { Result } from './result/namespace.ts'
 
 const STRATEGY_BRAND: unique symbol = Symbol.for('@julr/tenace/strategy') as never
 
 /**
  * Calls the next (inner) step of the policy. Always resolves to a Result.
  */
-export type Next = (context: ExecutionContext) => Promise<AnyResult>
+export type Next = (context: ExecutionContext) => Promise<Result.Any>
 
 /**
  * Type-level description of what a strategy does to the error channel:
@@ -57,7 +57,7 @@ export abstract class Strategy<out Adds = never, in Removes = never, out Value =
    */
   abstract readonly 'name': string
 
-  abstract execute(context: ExecutionContext, next: Next): Promise<AnyResult>
+  abstract execute(context: ExecutionContext, next: Next): Promise<Result.Any>
 
   static {
     Object.defineProperty(this.prototype, STRATEGY_BRAND, { value: true })

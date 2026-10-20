@@ -1,6 +1,6 @@
 import type { CircuitRejectionState } from './errors.ts'
 import { reportError } from './internal/report_error.ts'
-import type { AnyResult } from './result/core.ts'
+import type { Result } from './result/namespace.ts'
 import type { CircuitState } from './strategies/circuit_breaker/machine.ts'
 
 export type Attributes = Readonly<Record<string, string | number | boolean>>
@@ -90,7 +90,7 @@ export interface ExecutionScope {
    * Wraps each call of the user function. Run `run` inside your span context so the user's
    * own spans (HTTP, DB) get the attempt span as parent. Resolves to a Result, never rejects.
    */
-  attempt(info: AttemptInfo, run: () => Promise<AnyResult>): Promise<AnyResult>
+  attempt(info: AttemptInfo, run: () => Promise<Result.Any>): Promise<Result.Any>
   event(event: TenaceEvent): void
 }
 
@@ -102,20 +102,20 @@ export interface ExecutionScope {
 export interface Instrumentation {
   execution(
     info: ExecutionInfo,
-    run: (scope: ExecutionScope) => Promise<AnyResult>,
-  ): Promise<AnyResult>
+    run: (scope: ExecutionScope) => Promise<Result.Any>,
+  ): Promise<Result.Any>
 }
 
 export const noopScope: ExecutionScope = Object.freeze({
-  attempt: (_info: AttemptInfo, run: () => Promise<AnyResult>): Promise<AnyResult> => run(),
+  attempt: (_info: AttemptInfo, run: () => Promise<Result.Any>): Promise<Result.Any> => run(),
   event: (): void => {},
 })
 
 export const noopInstrumentation: Instrumentation = Object.freeze({
   execution: (
     _info: ExecutionInfo,
-    run: (scope: ExecutionScope) => Promise<AnyResult>,
-  ): Promise<AnyResult> => run(noopScope),
+    run: (scope: ExecutionScope) => Promise<Result.Any>,
+  ): Promise<Result.Any> => run(noopScope),
 })
 
 /**

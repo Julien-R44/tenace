@@ -2,7 +2,7 @@ import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { ChaosError, UnexpectedError } from '../errors.ts'
 import { sleep } from '../internal/sleep.ts'
-import { type AnyResult, err, ok } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface ChaosOptions<E = never, V = never> {
@@ -61,7 +61,7 @@ export class Chaos<E = never, V = never> extends Strategy<E, never, V> {
     this.#options = options
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const { enabled = true, random = Math.random, latency, throws, error, value } = this.#options
     const active = typeof enabled === 'function' ? enabled() : enabled
     if (!active || this.#rate === 0 || random() >= this.#rate) return next(context)
@@ -69,17 +69,17 @@ export class Chaos<E = never, V = never> extends Strategy<E, never, V> {
     if (latency !== undefined) {
       const ms = toMs(typeof latency === 'function' ? latency() : latency)
       if (!(await sleep(context.clock, ms, context.signal))) {
-        return err(new UnexpectedError(context.signal.reason))
+        return Result.err(new UnexpectedError(context.signal.reason))
       }
     }
     try {
-      if (error) return err(error())
-      if (value) return ok(value())
-      if (throws) return err(new UnexpectedError(throws()))
+      if (error) return Result.err(error())
+      if (value) return Result.ok(value())
+      if (throws) return Result.err(new UnexpectedError(throws()))
     } catch (thrown) {
-      return err(new UnexpectedError(thrown))
+      return Result.err(new UnexpectedError(thrown))
     }
-    if (latency === undefined) return err(new UnexpectedError(new ChaosError()))
+    if (latency === undefined) return Result.err(new UnexpectedError(new ChaosError()))
     return next(context)
   }
 }

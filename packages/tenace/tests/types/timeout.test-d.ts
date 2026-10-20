@@ -1,6 +1,6 @@
 import type { TimeoutError, UnexpectedError } from '../../src/errors.ts'
 import type { ErrorOf } from '../../src/policy.ts'
-import type { Result } from '../../src/result/core.ts'
+import type { Result } from '../../src/result/namespace.ts'
 import { Timeout } from '../../src/strategies/timeout.ts'
 import { Tenace } from '../../src/tenace.ts'
 import type { NotFound } from '../helpers/strategies.ts'

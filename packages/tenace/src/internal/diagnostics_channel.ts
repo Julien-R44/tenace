@@ -4,13 +4,13 @@ import type {
   Instrumentation,
   TenaceEvent,
 } from '../instrumentation.ts'
-import type { AnyResult } from '../result/core.ts'
+import type { Result } from '../result/namespace.ts'
 
 /**
  * Message of the `tracing:tenace:execution:*` channels. `result` is the final Tenace Result.
  */
 export interface ExecutionMessage extends ExecutionInfo {
-  result?: AnyResult
+  result?: Result.Any
   error?: unknown
   [key: symbol]: unknown
 }
@@ -21,7 +21,7 @@ export interface ExecutionMessage extends ExecutionInfo {
 export interface AttemptMessage {
   readonly execution: ExecutionMessage
   readonly attempt: number
-  result?: AnyResult
+  result?: Result.Any
   error?: unknown
   [key: symbol]: unknown
 }
@@ -110,8 +110,8 @@ export function diagnosticsChannel(): DiagnosticsChannelInstrumentation | undefi
       events.hasSubscribers,
     execution(
       info: ExecutionInfo,
-      run: (scope: ExecutionScope) => Promise<AnyResult>,
-    ): Promise<AnyResult> {
+      run: (scope: ExecutionScope) => Promise<Result.Any>,
+    ): Promise<Result.Any> {
       const message: ExecutionMessage = { ...info }
       const scope: ExecutionScope = {
         attempt: (attemptInfo, fn) =>

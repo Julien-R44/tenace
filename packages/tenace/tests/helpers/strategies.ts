@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../../src/context.ts'
 import { TenaceError } from '../../src/errors.ts'
-import { type AnyResult, err, ok } from '../../src/result/core.ts'
+import { Result } from '../../src/result/namespace.ts'
 import { type Next, Strategy } from '../../src/strategy.ts'
 
 export class BoomError extends TenaceError {
@@ -28,7 +28,7 @@ export class Trace extends Strategy {
     this.log = log
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     this.log.push(`${this.name}:in`)
     const result = await next(context)
     this.log.push(`${this.name}:out`)
@@ -42,9 +42,9 @@ export class Trace extends Strategy {
 export class Explode extends Strategy<BoomError> {
   readonly name = 'explode'
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const result = await next(context)
-    return result.ok ? err(new BoomError('boom')) : result
+    return result.ok ? Result.err(new BoomError('boom')) : result
   }
 }
 
@@ -60,9 +60,9 @@ export class Rescue<const V> extends Strategy<never, unknown, V> {
     this.value = value
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const result = await next(context)
-    return result.ok ? result : ok(this.value)
+    return result.ok ? result : Result.ok(this.value)
   }
 }
 
@@ -73,7 +73,7 @@ export class Counter extends Strategy {
   readonly name = 'counter'
   calls = 0
 
-  execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     this.calls++
     return next(context)
   }
@@ -85,7 +85,7 @@ export class Counter extends Strategy {
 export class Twice extends Strategy {
   readonly name = 'twice'
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     await next(context)
     return next(context.with({ attempt: context.attempt + 1 }))
   }

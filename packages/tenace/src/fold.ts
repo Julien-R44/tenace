@@ -1,5 +1,5 @@
 import type { UnexpectedError } from './errors.ts'
-import type { Err, Ok } from './result/core.ts'
+import type { Result } from './result/namespace.ts'
 import type { ResultTypes } from './result/registry.ts'
 import type { AnyOp, Op } from './strategy.ts'
 
@@ -44,9 +44,9 @@ type IsAny<T> = 0 extends 1 & T ? true : false
 type Foreign<R> = ResultTypes<R>[Exclude<keyof ResultTypes<R>, '~input'>]
 
 type MemberValue<R> =
-  R extends Ok<infer T>
+  R extends Result.Ok<infer T>
     ? T
-    : R extends Err<unknown>
+    : R extends Result.Err<unknown>
       ? never
       : [Foreign<R>] extends [never]
         ? R
@@ -55,9 +55,9 @@ type MemberValue<R> =
           : never
 
 type MemberError<R> =
-  R extends Err<infer E>
+  R extends Result.Err<infer E>
     ? E
-    : R extends Ok<unknown>
+    : R extends Result.Ok<unknown>
       ? never
       : [Foreign<R>] extends [never]
         ? never

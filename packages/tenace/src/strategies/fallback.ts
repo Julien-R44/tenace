@@ -1,6 +1,6 @@
 import type { Context, ExecutionContext } from '../context.ts'
 import type { GuardedTags, HandlerError, ValueOfReturn } from '../fold.ts'
-import { type AnyResult, err } from '../result/core.ts'
+import { Result } from '../result/namespace.ts'
 import { toResult } from '../result/registry.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
@@ -42,7 +42,7 @@ export class Fallback<
     this.#when = when ?? (() => true)
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const result = await next(context)
     if (result.ok || context.signal.aborted || !this.#when(result.error)) return result
     context.emit({ type: 'fallback.used', error: result.error })
@@ -69,8 +69,8 @@ export class MapError<E = unknown> extends Strategy<E, unknown> {
     this.#mapper = mapper
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const result = await next(context)
-    return result.ok ? result : err(this.#mapper(result.error as never))
+    return result.ok ? result : Result.err(this.#mapper(result.error as never))
   }
 }

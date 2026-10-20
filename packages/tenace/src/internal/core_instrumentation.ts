@@ -4,14 +4,14 @@ import {
   type Instrumentation,
   noopScope,
 } from '../instrumentation.ts'
-import type { AnyResult } from '../result/core.ts'
+import type { Result } from '../result/namespace.ts'
 import { reportError } from './report_error.ts'
 
 type Outcome =
-  | { readonly ok: true; readonly value: AnyResult }
+  | { readonly ok: true; readonly value: Result.Any }
   | { readonly ok: false; readonly error: unknown }
 
-function invoke<A>(fn: (arg: A) => Promise<AnyResult>, arg: A): Promise<AnyResult> {
+function invoke<A>(fn: (arg: A) => Promise<Result.Any>, arg: A): Promise<Result.Any> {
   try {
     return Promise.resolve(fn(arg))
   } catch (error) {
@@ -30,13 +30,13 @@ function invoke<A>(fn: (arg: A) => Promise<AnyResult>, arg: A): Promise<AnyResul
  *   it (with `fallback`). A hook that never settles still blocks the execution.
  */
 async function enforce<A>(
-  hook: (proceed: (arg: A) => Promise<AnyResult>) => unknown,
-  inner: (arg: A) => Promise<AnyResult>,
+  hook: (proceed: (arg: A) => Promise<Result.Any>) => unknown,
+  inner: (arg: A) => Promise<Result.Any>,
   fallback: A,
-): Promise<AnyResult> {
+): Promise<Result.Any> {
   const state: { outcome?: Promise<Outcome>; failure?: { error: unknown } | undefined } = {}
   const refused: unknown[] = []
-  const proceed = (arg: A): Promise<AnyResult> => {
+  const proceed = (arg: A): Promise<Result.Any> => {
     if (state.outcome) {
       const error = new TypeError('Tenace: an instrumentation called run() more than once')
       refused.push(error)
@@ -105,8 +105,8 @@ function guardScope(scope: ExecutionScope, isDone: () => boolean): ExecutionScop
 function observe(
   instrumentation: Instrumentation,
   info: ExecutionInfo,
-  run: (scope: ExecutionScope) => Promise<AnyResult>,
-): Promise<AnyResult> {
+  run: (scope: ExecutionScope) => Promise<Result.Any>,
+): Promise<Result.Any> {
   let done = false
   const finish = (): void => {
     done = true

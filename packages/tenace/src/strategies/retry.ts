@@ -1,7 +1,7 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { sleep, yieldToEventLoop } from '../internal/sleep.ts'
-import type { AnyResult } from '../result/core.ts'
+import type { Result } from '../result/namespace.ts'
 import { type Next, Strategy } from '../strategy.ts'
 import type { TagOf } from '../types.ts'
 import { backoff } from '../backoff.ts'
@@ -158,7 +158,7 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
       options.maxDelay === undefined ? Number.POSITIVE_INFINITY : toMs(options.maxDelay)
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     this.#options.budget?.recordExecution(context.clock)
 
     let immediateRetries = 0
@@ -209,7 +209,7 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
   /**
    * Why `result` should be retried, if it should.
    */
-  #causeOf(result: AnyResult, attempt: number): RetryCause<E, V> | undefined {
+  #causeOf(result: Result.Any, attempt: number): RetryCause<E, V> | undefined {
     if (result.ok) {
       const { retryIfValue } = this.#options
       const value = result.value as V

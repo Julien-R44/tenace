@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ExecutionContext } from '../src/context.ts'
 import { UnexpectedError } from '../src/errors.ts'
-import { type AnyResult, err, isResult, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import type * as PolicyModule from '../src/policy.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import type * as BreakerModule from '../src/strategies/circuit_breaker/circuit_breaker.ts'
@@ -27,8 +27,8 @@ test.group('Policy | execute', () => {
     assert.equal(await policy.execute(async () => 'a'), 'a')
   })
 
-  test('unwraps a returned ok()', async ({ assert }) => {
-    assert.equal(await Tenace.policy().execute(() => ok(42)), 42)
+  test('unwraps a returned Result.ok()', async ({ assert }) => {
+    assert.equal(await Tenace.policy().execute(() => Result.ok(42)), 42)
   })
 
   test('rethrows raw thrown values untouched, they are not policy errors', async ({ assert }) => {
@@ -61,10 +61,12 @@ test.group('Policy | execute', () => {
     assert.isTrue(!result.ok && result.error.cause === raw)
   })
 
-  test('rejects with a returned err() and recognizes it with isError()', async ({ assert }) => {
+  test('rejects with a returned Result.err() and recognizes it with isError()', async ({
+    assert,
+  }) => {
     const policy = Tenace.policy()
     const notFound = new NotFound('user')
-    const thrown = await policy.execute(() => err(notFound)).catch((error: unknown) => error)
+    const thrown = await policy.execute(() => Result.err(notFound)).catch((error: unknown) => error)
 
     assert.strictEqual(thrown, notFound)
     assert.isTrue(policy.isError(thrown))
@@ -97,10 +99,10 @@ test.group('Policy | execute', () => {
 })
 
 test.group('Policy | settle', () => {
-  test('resolves with ok(value)', async ({ assert }) => {
+  test('resolves with Result.ok(value)', async ({ assert }) => {
     const result = await Tenace.policy().settle(async () => 'a')
-    assert.isTrue(isResult(result))
-    assert.deepEqual(result, ok('a'))
+    assert.isTrue(Result.is(result))
+    assert.deepEqual(result, Result.ok('a'))
   })
 
   test('wraps raw throws in UnexpectedError, keeping the thrown value as cause', async ({
@@ -116,9 +118,9 @@ test.group('Policy | settle', () => {
     assert.strictEqual(result.error.cause, raw)
   })
 
-  test('returns err() of the function and of strategies as is', async ({ assert }) => {
+  test('returns Result.err() of the function and of strategies as is', async ({ assert }) => {
     const notFound = new NotFound('x')
-    assert.deepEqual(await Tenace.policy().settle(() => err(notFound)), err(notFound))
+    assert.deepEqual(await Tenace.policy().settle(() => Result.err(notFound)), Result.err(notFound))
 
     const exploded = await Tenace.policy()
       .with(new Explode())
@@ -219,7 +221,7 @@ test.group('Policy | composition', () => {
 
     class Foreign extends copies.strategy.Strategy {
       readonly name = 'foreign'
-      execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+      execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
         return next(context)
       }
     }
@@ -349,7 +351,7 @@ test.group('Tenace.call', () => {
     const call = Tenace.call(async () => ++calls).with(new Counter())
 
     assert.equal(await call.execute(), 1)
-    assert.deepEqual(await call.settle(), ok(2))
+    assert.deepEqual(await call.settle(), Result.ok(2))
   })
 
   test('the bound function receives the context and the caller signal', async ({ assert }) => {

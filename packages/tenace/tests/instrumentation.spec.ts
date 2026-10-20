@@ -13,7 +13,7 @@ import {
   type TenaceEvent,
 } from '../src/instrumentation.ts'
 import type { EventMessage, ExecutionMessage } from '../src/internal/diagnostics_channel.ts'
-import { err, ok } from '../src/result/core.ts'
+import { Result } from '../src/result/namespace.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
@@ -56,7 +56,7 @@ test.group('Instrumentation | around-advice', () => {
     let calls = 0
     const value = await Tenace.policy({ name: 'users.get', instrumentation: tracer('t', log) })
       .withRetry({ retries: 2, delay: 0 })
-      .execute(() => (++calls < 2 ? err('nope') : ok('user')))
+      .execute(() => (++calls < 2 ? Result.err('nope') : Result.ok('user')))
 
     assert.equal(value, 'user')
     assert.deepEqual(log, [
@@ -96,7 +96,7 @@ test.group('Instrumentation | around-advice', () => {
     await Tenace.policy({ name: 'policy-name', instrumentation })
       .withTimeout(1000)
       .withRetry({ retries: 1, delay: 0 })
-      .settle(() => err('x'), { name: 'call-name', attributes: { tenant: 'acme' } })
+      .settle(() => Result.err('x'), { name: 'call-name', attributes: { tenant: 'acme' } })
     assert.deepEqual(infos[0], {
       name: 'call-name',
       strategies: ['retry', 'timeout'],
@@ -147,16 +147,16 @@ test.group('Instrumentation | around-advice', () => {
           ),
         })
           .withRetry({ retries: 1, delay: 0 })
-          .settle(() => err('x')),
+          .settle(() => Result.err('x')),
         Tenace.policy({
           instrumentation: listener(() => {
             throw boom
           }),
         })
           .withRetry({ retries: 1, delay: 0 })
-          .settle(() => err('x')),
+          .settle(() => Result.err('x')),
       ])
-      assert.deepEqual(results, [err('x'), err('x')])
+      assert.deepEqual(results, [Result.err('x'), Result.err('x')])
     } finally {
       if (original) holder.reportError = original
       else delete holder.reportError
@@ -181,16 +181,16 @@ test.group('Instrumentation | global', () => {
     try {
       await Tenace.policy()
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
       await Tenace.policy({ instrumentation: own.instrumentation })
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
     } finally {
       restore()
     }
     await Tenace.policy()
       .withRetry({ retries: 1, delay: 0 })
-      .settle(() => err('x'))
+      .settle(() => Result.err('x'))
 
     // the policy-level instrumentation is added to the global one
     assert.deepEqual(global.types(), [
@@ -208,7 +208,7 @@ test.group('Instrumentation | global', () => {
     try {
       await Tenace.policy({ instrumentation: global.instrumentation })
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
     } finally {
       restore()
     }
@@ -222,7 +222,7 @@ test.group('Instrumentation | global', () => {
     const run = (instrumentation: Instrumentation) =>
       Tenace.policy({ instrumentation })
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
     const restore = Tenace.instrument(a.instrumentation, b.instrumentation)
     try {
       await run(a.instrumentation)
@@ -242,7 +242,7 @@ test.group('Instrumentation | global', () => {
     try {
       await Tenace.policy({ instrumentation: false })
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
     } finally {
       restore()
     }
@@ -279,7 +279,7 @@ test.group('Instrumentation | events', () => {
     const { events, instrumentation } = recorder()
     await Tenace.policy({ instrumentation })
       .withRetry({ retries: 2, delay: 5 })
-      .settle(() => err('boom'))
+      .settle(() => Result.err('boom'))
     assert.deepEqual(events, [
       { type: 'retry.scheduled', attempt: 1, delayMs: 5, error: 'boom' },
       { type: 'retry.scheduled', attempt: 2, delayMs: 5, error: 'boom' },
@@ -307,7 +307,7 @@ test.group('Instrumentation | events', () => {
       clock: new TestClock(),
     })
     const policy = Tenace.policy({ instrumentation }).with(breaker)
-    await policy.settle(() => err('down'))
+    await policy.settle(() => Result.err('down'))
     await policy.settle(() => 'never')
     assert.deepEqual(events, [
       { type: 'circuit.state_changed', breaker: 'users-api', from: 'closed', to: 'open' },
@@ -343,7 +343,7 @@ test.group('Instrumentation | diagnostics_channel', () => {
     try {
       await Tenace.policy({ name: 'dc' })
         .withRetry({ retries: 1, delay: 0 })
-        .settle(() => err('x'))
+        .settle(() => Result.err('x'))
     } finally {
       diagnosticsChannel.unsubscribe('tracing:tenace:execution:asyncEnd', onExecution)
       diagnosticsChannel.unsubscribe('tracing:tenace:attempt:start', onAttempt)
@@ -352,7 +352,7 @@ test.group('Instrumentation | diagnostics_channel', () => {
 
     assert.lengthOf(executions, 1)
     assert.equal(executions[0]!.name, 'dc')
-    assert.deepEqual(executions[0]!.result, err('x'))
+    assert.deepEqual(executions[0]!.result, Result.err('x'))
     assert.deepEqual(attempts, [1, 2])
     assert.deepEqual(events, ['retry.scheduled', 'retry.exhausted'])
 
@@ -372,7 +372,7 @@ test.group('Instrumentation | diagnostics_channel', () => {
         .withRetry({ retries: 1, delay: 0 })
         .settle(() => {
           diagnosticsChannel.subscribe('tracing:tenace:attempt:start', onAttempt)
-          return err('x')
+          return Result.err('x')
         })
     } finally {
       diagnosticsChannel.unsubscribe('tracing:tenace:attempt:start', onAttempt)
