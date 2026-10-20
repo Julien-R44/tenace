@@ -18,7 +18,7 @@
   "author": "Julien Ripouteau <julien@ripouteau.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/julien-r44/tenace.git",
+    "url": "git+https://github.com/Julien-R44/tenace.git",
     "directory": "packages/tenace"
   },
   "files": [
