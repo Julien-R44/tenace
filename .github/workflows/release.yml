@@ -48,6 +48,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0 # the changelog looks up the commit that added each changeset
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
