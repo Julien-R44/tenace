@@ -75,12 +75,12 @@ The interface has one method:
 interface Instrumentation {
   execution(
     info: ExecutionInfo,
-    run: (scope: ExecutionScope) => Promise<AnyResult>,
-  ): Promise<AnyResult>
+    run: (scope: ExecutionScope) => Promise<Result.Any>,
+  ): Promise<Result.Any>
 }
 
 interface ExecutionScope {
-  attempt(info: AttemptInfo, run: () => Promise<AnyResult>): Promise<AnyResult>
+  attempt(info: AttemptInfo, run: () => Promise<Result.Any>): Promise<Result.Any>
   event(event: TenaceEvent): void
 }
 ```

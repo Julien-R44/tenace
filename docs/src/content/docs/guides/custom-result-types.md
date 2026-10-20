@@ -48,13 +48,13 @@ The entry name, `app` here, is the name you register at runtime.
 `registerResult(name, adapter)` registers a function that converts one of your results to a Tenace Result. It returns `undefined` for any other value:
 
 ```ts nocheck
-import { err, ok, registerResult } from '@julr/tenace'
+import { registerResult, Result } from '@julr/tenace'
 
 registerResult('app', value =>
   value instanceof AppOk
-    ? ok(value.data)
+    ? Result.ok(value.data)
     : value instanceof AppErr
-      ? err(value.failure)
+      ? Result.err(value.failure)
       : undefined,
 )
 ```

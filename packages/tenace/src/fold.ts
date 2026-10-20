@@ -73,7 +73,7 @@ export type ValueOfReturn<R> =
 
 /**
  * Errors contributed by what a function returned. Thrown values are always `UnexpectedError`.
- * An `unknown` return may be any `err(...)`: `unknown`. An `any` return (parsed JSON) is a
+ * An `unknown` return may be any `Result.err(...)`: `unknown`. An `any` return (parsed JSON) is a
  * value, not a Result.
  */
 export type ErrorOfReturn<R> =
@@ -84,8 +84,8 @@ export type ErrorOfReturn<R> =
       : (R extends unknown ? MemberError<R> : never) | UnexpectedError
 
 /**
- * Errors returned (not thrown) by a handler, such as a fallback returning `err(...)`.
- * An `unknown` return may be any `err(...)`: `unknown`. An `any` return is a value.
+ * Errors returned (not thrown) by a handler, such as a fallback returning `Result.err(...)`.
+ * An `unknown` return may be any `Result.err(...)`: `unknown`. An `any` return is a value.
  */
 export type HandlerError<R> =
   IsAny<R> extends true

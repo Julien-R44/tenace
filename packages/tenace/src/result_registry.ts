@@ -43,7 +43,7 @@ const adapters: Map<string, ResultAdapter> = (registry[REGISTRY_KEY] ??= new Map
  *
  * ```ts
  * registerResult('neverthrow', value =>
- *   value instanceof Ok ? ok(value.value) : value instanceof Err ? err(value.error) : undefined,
+ *   value instanceof Ok ? Result.ok(value.value) : value instanceof Err ? Result.err(value.error) : undefined,
  * )
  * ```
  */

@@ -2,7 +2,7 @@
  * Timeout per attempt, retries with backoff, then execute() or settle().
  * Run: node --conditions=tenace-source --import=@poppinss/ts-exec examples/01_basics.ts
  */
-import { backoff, match, Tenace } from '@julr/tenace'
+import { backoff, Result, Tenace } from '@julr/tenace'
 
 let calls = 0
 async function fetchProfile({ signal }: { signal: AbortSignal }): Promise<{ name: string }> {
@@ -33,7 +33,7 @@ calls = 0
 const result = await policy.settle(fetchProfile)
 console.log(
   'settle:',
-  match(result, {
+  Result.match(result, {
     ok: value => `hello ${value.name}`,
     TimeoutError: error => `timed out after ${error.timeoutMs}ms`,
     UnexpectedError: error => `failed: ${String(error.cause)}`,

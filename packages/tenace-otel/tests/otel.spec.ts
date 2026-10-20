@@ -8,7 +8,7 @@ import {
   type ReadableSpan,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base'
-import { CircuitBreaker, err, Tenace, TenaceError } from '@julr/tenace'
+import { CircuitBreaker, Result, Tenace, TenaceError } from '@julr/tenace'
 
 import { errorType, openTelemetry } from '../src/index.ts'
 
@@ -120,7 +120,9 @@ test.group('openTelemetry', group => {
 
   test('the execution span records the final failure', async ({ assert }) => {
     const { instrumentation, byName } = setup()
-    await Tenace.policy({ name: 'charge', instrumentation }).settle(() => err(new HttpError('402')))
+    await Tenace.policy({ name: 'charge', instrumentation }).settle(() =>
+      Result.err(new HttpError('402')),
+    )
     const [root] = byName('charge')
     assert.equal(root!.status.code, SpanStatusCode.ERROR)
     assert.equal(root!.attributes['error.type'], 'HttpError')
@@ -195,7 +197,7 @@ test.group('openTelemetry', group => {
     const { instrumentation, spans, byName, metric } = setup()
     const result = await Tenace.policy({ name: 'opaque', instrumentation })
       .withRetry({ retries: 1, delay: 0 })
-      .settle(async () => err(Object.create(null)))
+      .settle(async () => Result.err(Object.create(null)))
     assert.isFalse(result.ok)
 
     assert.sameMembers(
@@ -214,7 +216,7 @@ test.group('openTelemetry', group => {
     await Tenace.policy({ name: 'nested-retries', instrumentation })
       .withRetry({ retries: 1, delay: 0 })
       .withRetry({ retries: 1, delay: 0 })
-      .settle(() => err('down'))
+      .settle(() => Result.err('down'))
 
     const attempts = byName('nested-retries attempt')
     assert.deepEqual(

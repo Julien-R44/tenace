@@ -19,17 +19,17 @@ const result = await Tenace.policy()
 ## Where errors come from
 
 - **Thrown values.** Anything your function throws becomes an `UnexpectedError`. Every channel contains `UnexpectedError`, because any function can throw.
-- **Returned errors.** A function that returns `err(error)`, or a promise of it, adds the type of `error` to the channel. A function typed to return `unknown` or `any` may return any `err(...)`, so its error channel is `unknown`.
+- **Returned errors.** A function that returns `Result.err(error)`, or a promise of it, adds the type of `error` to the channel. A function typed to return `unknown` or `any` may return any `Result.err(...)`, so its error channel is `unknown`.
 - **Strategies.** Each strategy declares what it adds and removes. The [error reference](/reference/errors/) lists the errors Tenace produces.
 
 Thrown values stay outside the channel on purpose. TypeScript cannot know what a function throws, so a type that claims to know would lie. A function that wants its errors typed returns them.
 
 ## Define an error
 
-An error is typed by its `_tag`, a string literal that tells it apart from the other members of the union. Extend `TenaceError`, declare `_tag` and `code` as literal fields, and return the error with `err()`:
+An error is typed by its `_tag`, a string literal that tells it apart from the other members of the union. Extend `TenaceError`, declare `_tag` and `code` as literal fields, and return the error with `Result.err()`:
 
 ```ts
-import { err, ok, type Result, Tenace, TenaceError } from '@julr/tenace'
+import { Result, Tenace, TenaceError } from '@julr/tenace'
 
 class NotFound extends TenaceError {
   static readonly tag = 'NotFound'
@@ -41,7 +41,7 @@ declare const db: { find(id: string): Promise<User | undefined> }
 
 async function findUser(id: string): Promise<Result<User, NotFound>> {
   const user = await db.find(id)
-  return user ? ok(user) : err(new NotFound(`user ${id}`))
+  return user ? Result.ok(user) : Result.err(new NotFound(`user ${id}`))
 }
 
 const result = await Tenace.policy()
@@ -63,20 +63,20 @@ if (!result.ok && result.error instanceof NotFound) {
 
 `isTenaceError(value)` returns `true` for any error created by any copy of Tenace.
 
-Errors do not have to extend `TenaceError`. Any object with a literal `_tag` works with `retryOn`, `withFallbackOn()`, and `match()`. Errors without a `_tag`, such as a string, still flow through the channel, and only the handlers that take every error can handle them: `withFallback()`, `withFallbackWhen()`, `mapError()`, `retryIf`, and the `_` case of `match()`. `withFallbackWhen()` handles them but does not remove them from the channel, because a type guard on an untagged class proves nothing about what it matches at runtime.
+Errors do not have to extend `TenaceError`. Any object with a literal `_tag` works with `retryOn`, `withFallbackOn()`, and `Result.match()`. Errors without a `_tag`, such as a string, still flow through the channel, and only the handlers that take every error can handle them: `withFallback()`, `withFallbackWhen()`, `mapError()`, `retryIf`, and the `_` case of `Result.match()`. `withFallbackWhen()` handles them but does not remove them from the channel, because a type guard on an untagged class proves nothing about what it matches at runtime.
 
 ## Match a Result
 
-`match(result, handlers)` calls the `ok` handler or the handler named after the error `_tag`, and returns what the handler returns. It is exhaustive. TypeScript reports a missing tag, and a handler for a tag that the result cannot contain.
+`Result.match(result, handlers)` calls the `ok` handler or the handler named after the error `_tag`, and returns what the handler returns. It is exhaustive. TypeScript reports a missing tag, and a handler for a tag that the result cannot contain.
 
 ```ts
-import { match, Tenace } from '@julr/tenace'
+import { Result, Tenace } from '@julr/tenace'
 
 const result = await Tenace.policy()
   .withTimeout('1s')
   .settle(() => getUser(id))
 
-const message = match(result, {
+const message = Result.match(result, {
   ok: user => `Hello ${user.name}`,
   TimeoutError: error => `Timed out after ${error.timeoutMs}ms`,
   UnexpectedError: error => `Failed: ${String(error.cause)}`,

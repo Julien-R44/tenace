@@ -5,7 +5,7 @@ Resilience policies for TypeScript that know every error they can return.
 Timeout, retry, circuit breaker, bulkhead, rate limit, lock, dedupe, cache, fallback, batches and chaos testing, composed into one policy. Each strategy adds its error to the type of the policy, and each fallback removes the errors it handles, so the compiler tells you what is left to handle.
 
 ```ts
-import { match, Tenace } from '@julr/tenace'
+import { Result, Tenace } from '@julr/tenace'
 
 const policy = Tenace.policy({ name: 'users.get' })
   .withTimeout('1s')
@@ -14,7 +14,7 @@ const policy = Tenace.policy({ name: 'users.get' })
 
 const result = await policy.settle(({ signal }) => fetchUser(id, { signal }))
 
-const message = match(result, {
+const message = Result.match(result, {
   ok: user => `Hello ${user.name}`,
   TimeoutError: () => 'The users API is slow, try again',
   CircuitOpenError: error => `The users API is down, retry in ${error.retryAfterMs}ms`,
@@ -36,8 +36,9 @@ Tenace is ESM only and has no runtime dependencies. It runs on Node.js 22.18 or 
 
 ## Why Tenace
 
-- **Typed errors.** Strategies add their errors to the type of the policy, fallbacks remove them, and your functions add their own by returning `err(...)`. `match()` needs one handler per error.
+- **Typed errors.** Strategies add their errors to the type of the policy, fallbacks remove them, and your functions add their own by returning `Result.err(...)`. `Result.match()` needs one handler per error.
 - **Promise or Result.** `execute()` resolves or rejects like any promise. `settle()` resolves with a typed `Result` instead.
+- **A small Result type, for your code too.** Tenace passes Results through every layer, and you can return them from your own services without a policy: `Result.ok()`, `Result.err()`, `Result.match()`, and `Result.try()`. See [Result pattern](https://tenace.julr.dev/concepts/result-pattern/).
 - **Composable.** `.with()` adds a strategy or inlines another policy. Policies are immutable, and a circuit breaker or bulkhead used by several policies is shared between them. Write your own strategy by extending `Strategy`.
 - **Safe defaults.** Timeouts abort the `signal` your function receives. Retries back off with jitter, honor `Retry-After`, can share a budget against retry storms, and skip calls that must not run twice.
 - **Testable.** `TestClock` drives timeouts, retry delays and open circuits without waiting. Chaos injects latency and faults into one policy, or into all of them.
@@ -76,10 +77,10 @@ With `settle()`, a thrown value becomes an `UnexpectedError` whose `cause` is th
 
 ### Your own errors
 
-Return `err(...)` instead of throwing, and the error joins the type of the policy:
+Return `Result.err(...)` instead of throwing, and the error joins the type of the policy:
 
 ```ts
-import { err, ok, type Result, Tenace, TenaceError } from '@julr/tenace'
+import { Result, Tenace, TenaceError } from '@julr/tenace'
 
 class NotFound extends TenaceError {
   readonly _tag = 'NotFound' as const
@@ -90,7 +91,7 @@ declare const db: { find(id: string): Promise<User | undefined> }
 
 async function findUser(id: string): Promise<Result<User, NotFound>> {
   const user = await db.find(id)
-  return user ? ok(user) : err(new NotFound(`No user ${id}`))
+  return user ? Result.ok(user) : Result.err(new NotFound(`No user ${id}`))
 }
 
 const user = await Tenace.call(() => findUser(id))

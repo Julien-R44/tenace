@@ -19,11 +19,11 @@ type Guarded<When> = When extends ((error: unknown) => error is infer X)
 type Always = (error: unknown) => error is unknown
 
 /**
- * Replaces errors matched by `when` with what `handler` returns: a value, an `ok()` /
- * `err()` Result, or a registered foreign Result (sync or async).
+ * Replaces errors matched by `when` with what `handler` returns: a value, a `Result.ok()` /
+ * `Result.err()` Result, or a registered foreign Result (sync or async).
  *
  * Not run when the signal is aborted. The handler must not throw: a throw is a bug and
- * rejects the execution. Return `err(...)` to fail on purpose.
+ * rejects the execution. Return `Result.err(...)` to fail on purpose.
  *
  * Typed versions: `.withFallback()`, `.withFallbackOn()`, `.withFallbackWhen()`. Used with
  * `.with()`, only a type guard `when` removes errors from the channel.

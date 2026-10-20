@@ -28,7 +28,7 @@ The difference is in the types of the callbacks: `retryIf`, `retryOn`, fallback 
 A reusable policy is built before it knows the functions it will run. Its callbacks see the errors the strategies add, plus an opaque `OtherError` that stands for whatever the functions return. The final `Result` type stays exact, because `settle(fn)` computes it from `fn`.
 
 ```ts
-import { err, type Result, Tenace, TenaceError } from '@julr/tenace'
+import { Result, Tenace, TenaceError } from '@julr/tenace'
 
 class HttpError extends TenaceError {
   readonly _tag = 'HttpError' as const

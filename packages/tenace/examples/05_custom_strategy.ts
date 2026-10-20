@@ -3,11 +3,10 @@
  * Run: node --conditions=tenace-source --import=@poppinss/ts-exec examples/05_custom_strategy.ts
  */
 import {
-  type AnyResult,
-  err,
   type ExecutionContext,
   listener,
   type Next,
+  Result,
   Strategy,
   Tenace,
   TenaceError,
@@ -31,10 +30,10 @@ class Quota extends Strategy<QuotaExceeded> {
     this.#max = max
   }
 
-  async execute(context: ExecutionContext, next: Next): Promise<AnyResult> {
+  async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     if (this.#used >= this.#max) {
       context.emit({ type: 'custom', name: 'quota.exceeded', attributes: { max: this.#max } })
-      return err(new QuotaExceeded(`quota of ${this.#max} calls exceeded`))
+      return Result.err(new QuotaExceeded(`quota of ${this.#max} calls exceeded`))
     }
     this.#used++
     return next(context)

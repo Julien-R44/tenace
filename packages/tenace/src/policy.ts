@@ -370,8 +370,8 @@ export class Policy<
   }
 
   /**
-   * Handles every error of the steps added before. The handler returns a value, `ok()`,
-   * `err()` (to fail with another error) or a promise of those. It must not throw.
+   * Handles every error of the steps added before. The handler returns a value, `Result.ok()`,
+   * `Result.err()` (to fail with another error) or a promise of those. It must not throw.
    *
    * ```ts
    * .withFallback(() => cachedUser) // the error channel is now empty
@@ -463,7 +463,7 @@ export class Policy<
   /**
    * Runs `fn` through the policy. Resolves with its value, or rejects with:
    * - the raw value `fn` threw (never wrapped),
-   * - a known error (an `err(...)` returned by `fn`, or one produced by a strategy, like
+   * - a known error (a `Result.err(...)` returned by `fn`, or one produced by a strategy, like
    *   `TimeoutError`). Narrow it with `policy.isError(error)`,
    * - `signal.reason` when the caller aborts.
    */
@@ -505,12 +505,12 @@ export class Policy<
   }
 
   /**
-   * Whether `error` was rejected by `execute()` of this policy as a known error (an `err()`
+   * Whether `error` was rejected by `execute()` of this policy as a known error (a `Result.err()`
    * of the function or an error of a strategy), and not a raw throw. Narrows to the errors
    * of the policy, undeclared ones (`OtherError`) included.
    *
    * Errors are tracked by identity, so:
-   * - primitive errors (`err('nope')`) are never recognized, inspect them with `settle()`,
+   * - primitive errors (`Result.err('nope')`) are never recognized, inspect them with `settle()`,
    * - errors rejected by another policy, even one derived from this one, are not recognized,
    * - an object stays recognized once rejected, even if it is later thrown raw (a shared
    *   sentinel error, for instance).

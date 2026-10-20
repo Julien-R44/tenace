@@ -19,7 +19,7 @@ const buildModules = await Promise.all(
 )
 
 const worker = `
-import { Tenace, TimeoutError, backoff, err } from './tenace/index.js'
+import { Result, Tenace, TimeoutError, backoff } from './tenace/index.js'
 
 export default {
   async fetch() {
@@ -39,7 +39,7 @@ export default {
       return 'ok after ' + attempt
     })
     const timeout = await Tenace.policy().withTimeout(5).settle(() => new Promise(() => {}))
-    const batch = await Tenace.map([1, 2, 3], n => (n === 2 ? err('two') : n), { concurrency: 2 }).settle()
+    const batch = await Tenace.map([1, 2, 3], n => (n === 2 ? Result.err('two') : n), { concurrency: 2 }).settle()
 
     return Response.json({
       value,

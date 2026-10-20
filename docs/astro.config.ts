@@ -56,6 +56,7 @@ export default defineConfig({
         {
           label: 'Concepts',
           items: [
+            'concepts/result-pattern',
             'concepts/strategy-order',
             'concepts/execute-and-settle',
             'concepts/typed-errors',
@@ -83,6 +84,7 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
+            'guides/results',
             'guides/batches',
             'guides/wait-for',
             'guides/keys-and-adapters',

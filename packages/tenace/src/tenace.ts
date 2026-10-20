@@ -26,7 +26,7 @@ export interface TenaceEntry {
   /**
    * A reusable policy, to run any function with `.execute(fn)` / `.settle(fn)`.
    *
-   * `E` declares the errors functions may return as `err(...)`, so callbacks
+   * `E` declares the errors functions may return as `Result.err(...)`, so callbacks
    * (`retryIf`, fallbacks...) can inspect them. Undeclared errors still flow through and
    * are exact in the final Result type; callbacks see them as an opaque `OtherError`.
    */

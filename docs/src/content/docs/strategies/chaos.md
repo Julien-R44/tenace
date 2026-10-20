@@ -37,8 +37,8 @@ A `rate` outside 0 to 1 throws a `RangeError` when the policy is built.
 For each call, chaos checks `enabled`, then draws a random number. The call is affected when the number is below `rate`. An affected call goes through these steps in order:
 
 1. With `latency`, it waits. An abort during the wait ends the call.
-2. With `error`, it returns `err(error())`.
-3. Otherwise, with `value`, it returns `ok(value())`.
+2. With `error`, it returns `Result.err(error())`.
+3. Otherwise, with `value`, it returns `Result.ok(value())`.
 4. Otherwise, with `throws`, it fails as if the function threw `throws()`.
 5. Otherwise, without `latency`, it fails as if the function threw a `ChaosError`.
 6. Otherwise, it calls the function after the latency.

@@ -38,7 +38,7 @@ export type AnyOp = Op<unknown, never>
  *   readonly name = 'audit'
  *   async execute(context: ExecutionContext, next: Next) {
  *     const result = await next(context)
- *     return result.ok ? result : err(new AuditError(result.error))
+ *     return result.ok ? result : Result.err(new AuditError(result.error))
  *   }
  * }
  * ```

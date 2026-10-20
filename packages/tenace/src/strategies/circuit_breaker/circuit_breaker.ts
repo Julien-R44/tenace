@@ -3,6 +3,7 @@ import type { ExecutionContext } from '../../context.ts'
 import { type Duration, toMs } from '../../duration.ts'
 import { CircuitOpenError, UnexpectedError } from '../../errors.ts'
 import { reportError } from '../../internal/report_error.ts'
+import { isThenable } from '../../internal/thenable.ts'
 import type { MaybePromise } from '../../internal/types.ts'
 import { type AnyResult, err } from '../../result.ts'
 import { type Next, Strategy } from '../../strategy.ts'
@@ -89,13 +90,6 @@ const REJECTION_TAGS: ReadonlySet<unknown> = new Set([
   'RateLimitError',
   'LockNotAcquiredError',
 ])
-
-/**
- * Any thenable, not only native promises of this realm (`instanceof Promise`).
- */
-function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-  return typeof (value as { then?: unknown } | null | undefined)?.then === 'function'
-}
 
 function defaultClassify(result: AnyResult): CallOutcome {
   if (result.ok) return 'success'

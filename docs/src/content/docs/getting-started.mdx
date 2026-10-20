@@ -106,10 +106,10 @@ You need Node.js 22.18 or later, which runs TypeScript files directly.
    [ 'fallback', 'retry', 'timeout' ]
    ```
 
-5. Read the outcome as a `Result` instead of a promise that may reject. Remove the fallback, call `settle()`, and handle each case with `match()`:
+5. Read the outcome as a `Result` instead of a promise that may reject. Remove the fallback, call `settle()`, and handle each case with `Result.match()`:
 
    ```ts title="profile.ts"
-   import { match, Tenace } from '@julr/tenace'
+   import { Result, Tenace } from '@julr/tenace'
 
    const policy = Tenace.policy()
      .withTimeout('100ms')
@@ -118,7 +118,7 @@ You need Node.js 22.18 or later, which runs TypeScript files directly.
    const result = await policy.settle(fetchProfile)
 
    console.log(
-     match(result, {
+     Result.match(result, {
        ok: profile => `Hello ${profile.name}`,
        TimeoutError: error => `Timed out after ${error.timeoutMs}ms`,
        UnexpectedError: error => `Failed: ${String(error.cause)}`,
@@ -132,7 +132,7 @@ You need Node.js 22.18 or later, which runs TypeScript files directly.
    Timed out after 100ms
    ```
 
-   `match()` requires one handler per error the policy can produce. Remove the `TimeoutError` handler and TypeScript reports the missing case.
+   `Result.match()` requires one handler per error the policy can produce. Remove the `TimeoutError` handler and TypeScript reports the missing case.
 
 </Steps>
 
@@ -140,6 +140,7 @@ We built a policy that bounds each attempt, retries timeouts with exponential ba
 
 ## Next steps
 
+- [Result pattern](/concepts/result-pattern/) explains the `Result` that `settle()` returned, and how to return one from your own code.
 - [Strategy order](/concepts/strategy-order/) explains why the timeout came before the retry.
 - [`execute()` and `settle()`](/concepts/execute-and-settle/) compares the two ways to run a policy.
 - [Typed errors](/concepts/typed-errors/) shows how your own errors join the error channel.

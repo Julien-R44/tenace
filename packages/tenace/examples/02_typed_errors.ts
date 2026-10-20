@@ -2,7 +2,7 @@
  * Functions returning Results contribute their errors to the channel.
  * Run: node --conditions=tenace-source --import=@poppinss/ts-exec examples/02_typed_errors.ts
  */
-import { err, ok, type Result, Tenace, TenaceError } from '@julr/tenace'
+import { Result, Tenace, TenaceError } from '@julr/tenace'
 
 class NotFound extends TenaceError {
   readonly _tag = 'NotFound' as const
@@ -24,9 +24,9 @@ type User = { id: string; name: string }
 let attempts = 0
 async function findUser(id: string): Promise<Result<User, NotFound | HttpError>> {
   attempts++
-  if (id === 'missing') return err(new NotFound(`user ${id}`))
-  if (attempts < 2) return err(new HttpError(503))
-  return ok({ id, name: 'Julien' })
+  if (id === 'missing') return Result.err(new NotFound(`user ${id}`))
+  if (attempts < 2) return Result.err(new HttpError(503))
+  return Result.ok({ id, name: 'Julien' })
 }
 
 // Tenace.call: callbacks see the exact errors of the function

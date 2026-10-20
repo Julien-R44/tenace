@@ -35,7 +35,7 @@ type Failure = ErrorOf<typeof policy>
 
 const result = await policy.settle(() => fetchUser(id))
 
-const message = match(result, {
+const message = Result.match(result, {
   ok: user => \`Hello \${user.name}\`,
   TimeoutError: () => 'The user service is slow',
   CircuitOpenError: () => 'The user service is down',

@@ -150,7 +150,7 @@ const response = await Tenace.call(({ signal }) => fetch(url, { signal }))
 ```
 
 - Errors and values share the `retries` count, the delays, `maxDelay`, and the budget. `retryOn` and `retryIf` still apply to errors only.
-- Once the retries are exhausted, the last value is returned as a success. The error channel does not change. To fail with a typed error instead, return `err(...)` from the function and retry it with `retryOn`.
+- Once the retries are exhausted, the last value is returned as a success. The error channel does not change. To fail with a typed error instead, return `Result.err(...)` from the function and retry it with `retryOn`.
 - `delay` and `onRetry` receive the cause of the retry, `{ error }` or `{ value }`. Tell them apart with `'value' in cause`. A response can set the delay, for example from its `Retry-After` header:
 
   ```ts

@@ -30,13 +30,13 @@ const user = await policy.execute(() => getUser(id)) // User | null
 ### What the handler returns
 
 - A value: the execution succeeds with it. Its type joins the value type of the policy.
-- `ok(value)`: the same.
-- `err(error)`: the execution fails with `error`, which joins the error channel.
+- `Result.ok(value)`: the same.
+- `Result.err(error)`: the execution fails with `error`, which joins the error channel.
 - A [registered foreign Result](/guides/custom-result-types/).
 - A promise of any of these.
 
 ```ts
-import { err, Tenace, TenaceError } from '@julr/tenace'
+import { Result, Tenace, TenaceError } from '@julr/tenace'
 
 class ServiceUnavailable extends TenaceError {
   readonly _tag = 'ServiceUnavailable' as const
@@ -49,14 +49,14 @@ const policy = Tenace.policy()
   .withTimeout('1s')
   .withFallbackOn(['TimeoutError'], async () => {
     const cached = await cache.get(`user:${id}`)
-    return cached ?? err(new ServiceUnavailable('users API timed out, nothing cached'))
+    return cached ?? Result.err(new ServiceUnavailable('users API timed out, nothing cached'))
   })
 
 const result = await policy.settle(() => getUser(id))
 //    ^? Result<User, UnexpectedError | ServiceUnavailable>
 ```
 
-The handler must not throw. A throwing handler is a bug, and the execution rejects with the thrown value. Return `err(...)` to fail on purpose.
+The handler must not throw. A throwing handler is a bug, and the execution rejects with the thrown value. Return `Result.err(...)` to fail on purpose.
 
 A fallback does not run when the signal is aborted.
 

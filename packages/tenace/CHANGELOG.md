@@ -6,10 +6,11 @@ Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime 
 
 ### Highlights
 
-- **Typed error channel.** A policy knows which errors it can produce. `.withTimeout()` adds `TimeoutError`, `.withFallbackOn(['TimeoutError'], ...)` removes it, and functions returning `err(...)` add their own errors. `ErrorOf<typeof policy>` gives the union.
-- **`execute()` or `settle()`.** `execute()` resolves with the value or rejects. `settle()` resolves with a typed `Result`, and `match()` handles each error tag exhaustively.
+- **Typed error channel.** A policy knows which errors it can produce. `.withTimeout()` adds `TimeoutError`, `.withFallbackOn(['TimeoutError'], ...)` removes it, and functions returning `Result.err(...)` add their own errors. `ErrorOf<typeof policy>` gives the union.
+- **`execute()` or `settle()`.** `execute()` resolves with the value or rejects. `settle()` resolves with a typed `Result`, and `Result.match()` handles each error tag exhaustively.
 - **One composition operator.** `.with(x)` adds a strategy or inlines another policy. Policies are immutable. Stateful strategies (circuit breakers, bulkheads, rate limits) are shared by identity between the policies that use them.
 - **Custom strategies.** Extend `Strategy<Adds, Removes>` to write your own, with the same typing as the built-in ones.
+- **Results without policies.** `Result` is both a type and a namespace: `Result.ok()`, `Result.err()`, `Result.match()`, plus `Result.try()` to wrap code that throws, `Result.all()` and `Result.partition()` to combine Results, and `Result.unwrap()` / `Result.unwrapErr()`. Import it from `@julr/tenace/result` to load only the Results and the error classes.
 - **Your own Result type.** Augment `ResultTypes` and call `registerResult()` to unwrap a Result library you already use.
 
 ### Strategies
@@ -64,7 +65,7 @@ Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime 
 ### Runtimes and packaging
 
 - ESM only, Node.js 22.18 or later, Bun, and Cloudflare Workers (with or without `nodejs_compat`). There are no static `node:` imports.
-- One module per source file, so a bundler only keeps what you import: `ok()` alone weighs about 130 bytes gzipped.
+- One module per source file, so a bundler only keeps what you import: `Result` alone weighs about 1 kB gzipped.
 
 ### Breaking changes
 

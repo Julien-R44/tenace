@@ -39,7 +39,6 @@ export type {
   EventMessage,
   ExecutionMessage,
 } from './internal/diagnostics_channel.ts'
-export { match } from './match.ts'
 export {
   type AnyPolicy,
   type Composable,
@@ -52,17 +51,7 @@ export {
   type PolicyOptions,
   type ReusablePolicy,
 } from './policy.ts'
-export {
-  type AnyResult,
-  type Err,
-  err,
-  type ErrorOfResult,
-  isResult,
-  type Ok,
-  ok,
-  type Result,
-  type ValueOf,
-} from './result.ts'
+export { Result } from './result_namespace.ts'
 export {
   registerResult,
   type ResultAdapter,

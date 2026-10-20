@@ -31,6 +31,10 @@
       "tenace-source": "./src/index.ts",
       "default": "./build/index.js"
     },
+    "./result": {
+      "tenace-source": "./src/result/index.ts",
+      "default": "./build/result/index.js"
+    },
     "./testing": {
       "tenace-source": "./src/testing/index.ts",
       "default": "./build/testing/index.js"

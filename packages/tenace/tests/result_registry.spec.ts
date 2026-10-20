@@ -2,6 +2,7 @@ import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
 import { err, ok } from '../src/result.ts'
+import { Result } from '../src/result/index.ts'
 import { registerResult, unregisterResult } from '../src/result_registry.ts'
 import { Tenace } from '../src/tenace.ts'
 import { AppErr, AppOk } from './helpers/app_result.ts'
@@ -42,10 +43,12 @@ test.group('Result registry', group => {
     registerResult('app', () => {
       throw bug
     })
-    const result = await Tenace.policy().settle(() => 1)
-    assert.isTrue(
-      !result.ok && result.error instanceof UnexpectedError && result.error.cause === bug,
-    )
+    const isBug = (result: Result<unknown, unknown>) =>
+      !result.ok && result.error instanceof UnexpectedError && result.error.cause === bug
+
+    assert.isTrue(isBug(await Tenace.policy().settle(() => 1)))
+    assert.isTrue(isBug(Result.try(() => 1)))
+    assert.isTrue(isBug(await Result.try(async () => 1)))
   })
 
   test('registering again replaces the adapter, unregister removes it', async ({ assert }) => {

@@ -1,4 +1,4 @@
-import { TenaceError, type UnexpectedError } from '../../src/errors.ts'
+import { TenaceError, UnexpectedError } from '../../src/errors.ts'
 import { match } from '../../src/match.ts'
 import { type Duration, toMs } from '../../src/duration.ts'
 import {
@@ -10,6 +10,7 @@ import {
   type ValueOf,
 } from '../../src/result.ts'
 import type { ByTag, TagOf } from '../../src/types.ts'
+import { Result as NS } from '../../src/result/index.ts'
 import { assertType, type Equal, expectType } from './helpers.ts'
 
 class NotFound extends TenaceError {
@@ -109,3 +110,88 @@ const durations: Duration[] = [100, '100ms', '1.5s', '2m', '1h', '1d']
 void durations
 // @ts-expect-error unknown unit
 toMs('10sec')
+
+/* ---- match infers the union of a function with several returns ---- */
+function signup(email: string) {
+  if (email === '') return err(new NotFound('user'))
+  if (email === 'taken') return err(new Gone('user'))
+  return ok({ id: email })
+}
+const signupView = match(signup('a'), { ok: user => user.id, NotFound: () => 404, Gone: () => 410 })
+expectType<Equal<typeof signupView, string | number>>()
+// @ts-expect-error Gone is not handled
+match(signup('a'), { ok: () => 0, NotFound: () => 404 })
+
+/* ---- Result namespace ---- */
+// a failed Result passes through to a Result with another value type
+async function rename(id: string): Promise<Result<string, NotFound | Gone>> {
+  const found = await Promise.resolve(result as Result<User, NotFound>)
+  if (!found.ok) return found
+  return id === '' ? NS.err(new Gone('user')) : NS.ok(found.value.id)
+}
+void rename
+
+expectType<Equal<typeof NS.ok, typeof ok>>()
+assertType<NS<User, AppError>>(result)
+assertType<NS.Ok<User> | NS.Err<AppError>>(result)
+expectType<Equal<NS.ValueOf<typeof result>, User>>()
+expectType<Equal<NS.ErrorOf<typeof result>, AppError>>()
+
+// an `unknown` return may be any `Result.err(...)`, as with policies, or a promise
+const parsed = NS.try(() => JSON.parse('{}') as unknown)
+expectType<Equal<typeof parsed, Result<unknown, unknown> | Promise<Result<unknown, unknown>>>>()
+// a promise only sometimes: either one, and awaiting it always gives a Result
+declare function readUser(cached: boolean): User | Promise<User>
+const sometimes = NS.try(() => readUser(true))
+expectType<
+  Equal<typeof sometimes, Result<User, UnexpectedError> | Promise<Result<User, UnexpectedError>>>
+>()
+expectType<Equal<Awaited<typeof sometimes>, Result<User, UnexpectedError>>>()
+// `any` (parsed JSON) and `never` (always throws) are not async
+const parsedAny = NS.try(() => JSON.parse('{}'))
+// oxlint-disable-next-line typescript/no-explicit-any
+expectType<Equal<typeof parsedAny, Result<any, UnexpectedError>>>()
+const thrown = NS.try(() => {
+  throw new Error('boom')
+})
+expectType<Equal<typeof thrown, Result<never, UnexpectedError>>>()
+const url = NS.try({
+  try: () => new URL('x'),
+  catch: cause => (expectType<Equal<typeof cause, unknown>>(), new NotFound('url')),
+})
+expectType<Equal<typeof url, Result<URL, NotFound>>>()
+const charged = NS.try({ try: async () => 42, catch: () => 'declined' as const })
+expectType<Equal<typeof charged, Promise<Result<number, 'declined'>>>>()
+const toError = () => 'x'
+// @ts-expect-error the positional mapper is gone, use { try, catch }
+NS.try(() => 1, toError)
+const fetched = NS.try(async () => ({ id: '1' }) as User)
+expectType<Equal<typeof fetched, Promise<Result<User, UnexpectedError>>>>()
+// a returned Result is flattened, sync or async
+const flattened = NS.try(() => result)
+assertType<Result<User, AppError | UnexpectedError>>(flattened)
+assertType<typeof flattened>(NS.err(new UnexpectedError('x')))
+// @ts-expect-error the value is User, not a nested Result
+assertType<typeof flattened>(NS.ok(result))
+const flattenedAsync = NS.try(() => signupAsync())
+expectType<
+  Equal<Awaited<typeof flattenedAsync>, Result<{ id: string }, NotFound | Gone | UnexpectedError>>
+>()
+async function signupAsync() {
+  return signup('a')
+}
+
+declare const rows: Result<User, NotFound>[]
+expectType<Equal<typeof allRows, Result<User[], NotFound>>>()
+const allRows = NS.all(rows)
+const pair = NS.all([NS.ok(1), result])
+expectType<Equal<typeof pair, Result<[number, User], AppError>>>()
+const split = NS.partition([NS.ok(1), result])
+expectType<Equal<typeof split, { values: (number | User)[]; errors: AppError[] }>>()
+
+expectType<Equal<ReturnType<typeof NS.unwrap<typeof result>>, User>>()
+const gone = NS.unwrapErr(result, 'Gone')
+expectType<Equal<typeof gone, Gone>>()
+expectType<Equal<ReturnType<typeof NS.unwrapErr<typeof result>>, AppError>>()
+// @ts-expect-error unknown tags are rejected
+NS.unwrapErr(result, 'Nope')

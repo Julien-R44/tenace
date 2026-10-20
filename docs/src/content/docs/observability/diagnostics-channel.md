@@ -24,14 +24,14 @@ interface ExecutionMessage {
   readonly name: string
   readonly strategies: readonly string[]
   readonly attributes: Attributes
-  result?: AnyResult // the final Result, set on asyncEnd
+  result?: Result.Any // the final Result, set on asyncEnd
   error?: unknown // set on error
 }
 
 interface AttemptMessage {
   readonly execution: ExecutionMessage
   readonly attempt: number
-  result?: AnyResult // the Result of the attempt
+  result?: Result.Any // the Result of the attempt
   error?: unknown
 }
 

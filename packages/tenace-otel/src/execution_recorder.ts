@@ -7,7 +7,7 @@ import {
   trace,
   type Tracer,
 } from '@opentelemetry/api'
-import type { AnyResult, AttemptInfo, ExecutionScope, TenaceEvent } from '@julr/tenace'
+import type { AttemptInfo, ExecutionScope, Result, TenaceEvent } from '@julr/tenace'
 
 import { errorType } from './error_type.ts'
 import { eventAttributes, eventName } from './events.ts'
@@ -53,7 +53,7 @@ export class ExecutionRecorder implements ExecutionScope {
     this.#base = { 'tenace.operation.name': options.name }
   }
 
-  attempt(info: AttemptInfo, run: () => Promise<AnyResult>): Promise<AnyResult> {
+  attempt(info: AttemptInfo, run: () => Promise<Result.Any>): Promise<Result.Any> {
     if (this.#ended) return run()
     this.#attempts++
     return this.#tracer.startActiveSpan(
@@ -96,10 +96,10 @@ export class ExecutionRecorder implements ExecutionScope {
     )
   }
 
-  async #runAttempt(span: Span, run: () => Promise<AnyResult>): Promise<AnyResult> {
+  async #runAttempt(span: Span, run: () => Promise<Result.Any>): Promise<Result.Any> {
     this.#running.add(span)
     const started = performance.now()
-    let result: AnyResult | undefined
+    let result: Result.Any | undefined
     try {
       result = await run()
       return result
@@ -109,7 +109,7 @@ export class ExecutionRecorder implements ExecutionScope {
     }
   }
 
-  #endAttempt(span: Span, started: number, result: AnyResult | undefined): void {
+  #endAttempt(span: Span, started: number, result: Result.Any | undefined): void {
     const failure = result && !result.ok ? { error: result.error } : undefined
     const duration = (performance.now() - started) / 1000
     runAll(

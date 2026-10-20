@@ -91,28 +91,37 @@ The function receives a `Context`:
 
 ## Results
 
+Import `Result` from `@julr/tenace`, or from `@julr/tenace/result` to load only the Results and the error classes. `Result` is both the type `Result<T, E>` and a namespace of functions.
+
 | Export                                                    | Description                                                                                                                     |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `ok(value?)`                                              | Builds `{ ok: true, value }`.                                                                                                   |
-| `err(error)`                                              | Builds `{ ok: false, error }`.                                                                                                  |
-| `isResult(value)`                                         | Whether `value` is a Result created by any copy of Tenace.                                                                      |
-| `match(result, handlers)`                                 | Calls the `ok` handler or the handler named after the error `_tag`. See [Typed errors](/concepts/typed-errors/#match-a-result). |
+| `Result.ok(value?)`                                       | Builds `{ ok: true, value }`.                                                                                                   |
+| `Result.err(error)`                                       | Builds `{ ok: false, error }`.                                                                                                  |
+| `Result.is(value)`                                        | Whether `value` is a Result created by any copy of Tenace.                                                                      |
+| `Result.match(result, handlers)`                          | Calls the `ok` handler or the handler named after the error `_tag`. See [Typed errors](/concepts/typed-errors/#match-a-result). |
+| `Result.try(fn)`, `Result.try({ try, catch })`            | Runs the function. What it throws or rejects with becomes an `UnexpectedError`, or what `catch` returns.                        |
+| `Result.all(results)`                                     | The values of every Result, in order, or the first error.                                                                       |
+| `Result.partition(results)`                               | `{ values, errors }`, each in input order.                                                                                      |
+| `Result.unwrap(result)`                                   | The value. Throws what `execute()` would reject with: the error, or the raw cause of an `UnexpectedError`.                      |
+| `Result.unwrapErr(result, tag?)`                          | The error. Throws when the Result is ok, or when the error has another `_tag`.                                                  |
 | `registerResult(name, adapter)`, `unregisterResult(name)` | Register a foreign Result type. See [Use your own Result type](/guides/custom-result-types/).                                   |
+
+[Result pattern](/concepts/result-pattern/) explains when to return a Result. [Work with Results](/guides/results/) shows the helpers in use.
 
 ## Types
 
-| Type                             | Description                                                                                            |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `Result<T, E>`                   | `Ok<T> \| Err<E>`.                                                                                     |
-| `ErrorOf<P>`                     | The errors of `P` without `OtherError`. Type a predicate passed to callbacks with `CurrentError`.      |
-| `CurrentError<P>`                | The errors the callbacks added at the end of `P` receive, `OtherError` included.                       |
-| `KnownError<E>`                  | `E` without `UnexpectedError`, `OtherError` included: the errors `execute()` rejects with as they are. |
-| `OtherError`                     | Stands for the errors a reusable policy did not declare.                                               |
-| `ReusablePolicy<V>`              | Any reusable policy, for a parameter that runs functions.                                              |
-| `AnyPolicy`                      | Any policy, bound or not. It cannot run a function.                                                    |
-| `ValueOf<R>`, `ErrorOfResult<R>` | The value and error types of a Result type.                                                            |
-| `TagOf<E>`, `ByTag<E, K>`        | The tags of an error union, and its members with tag `K`.                                              |
-| `Duration`                       | A number of milliseconds, or a string: `'250ms'`, `'1.5s'`, `'2m'`, `'1h'`, `'1d'`.                    |
+| Type                                     | Description                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `Result<T, E>`                           | `Result.Ok<T> \| Result.Err<E>`. `Result.Any` is any Result.                                           |
+| `ErrorOf<P>`                             | The errors of `P` without `OtherError`. Type a predicate passed to callbacks with `CurrentError`.      |
+| `CurrentError<P>`                        | The errors the callbacks added at the end of `P` receive, `OtherError` included.                       |
+| `KnownError<E>`                          | `E` without `UnexpectedError`, `OtherError` included: the errors `execute()` rejects with as they are. |
+| `OtherError`                             | Stands for the errors a reusable policy did not declare.                                               |
+| `ReusablePolicy<V>`                      | Any reusable policy, for a parameter that runs functions.                                              |
+| `AnyPolicy`                              | Any policy, bound or not. It cannot run a function.                                                    |
+| `Result.ValueOf<R>`, `Result.ErrorOf<R>` | The value and error types of a Result type.                                                            |
+| `TagOf<E>`, `ByTag<E, K>`                | The tags of an error union, and its members with tag `K`.                                              |
+| `Duration`                               | A number of milliseconds, or a string: `'250ms'`, `'1.5s'`, `'2m'`, `'1h'`, `'1d'`.                    |
 
 To type a parameter that receives a policy, see [Type a policy parameter](/concepts/reusable-and-bound-policies/#type-a-policy-parameter).
 

@@ -3,7 +3,7 @@ const ERROR_BRAND: unique symbol = Symbol.for('@julr/tenace/error') as never
 /**
  * Base class of every error produced by Tenace.
  *
- * - `_tag` is a literal discriminant used by the type-level error channel and `match()`.
+ * - `_tag` is a literal discriminant used by the type-level error channel and `Result.match()`.
  * - `code` is a stable `E_*` identifier for logs and serialization.
  * - `instanceof` keeps working across duplicated copies of the package (dual package,
  *   bundled + external, multiple versions) thanks to a global symbol brand.

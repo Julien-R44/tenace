@@ -1,4 +1,4 @@
-import type { Result } from './result.ts'
+import type { AnyResult, ErrorOfResult, ValueOf } from './result.ts'
 import type { ByTag, TagOf } from './types.ts'
 
 type Cases<T, E> = { readonly ok: (value: T) => unknown } & {
@@ -35,17 +35,17 @@ type Output<H> = {
  * handler (only possible with untyped input) is rethrown.
  *
  * ```ts
- * const view = match(result, {
+ * const view = Result.match(result, {
  *   ok: user => render(user),
  *   TimeoutError: () => retryLater(),
  *   _: error => fail(error),
  * })
  * ```
  */
-export function match<T, E, const H extends Cases<T, E> & NoExtraKeys<E, H>>(
-  result: Result<T, E>,
-  cases: H & Exhaustive<E, H>,
-): Output<H> {
+export function match<
+  R extends AnyResult,
+  const H extends Cases<ValueOf<R>, ErrorOfResult<R>> & NoExtraKeys<ErrorOfResult<R>, H>,
+>(result: R, cases: H & Exhaustive<ErrorOfResult<R>, H>): Output<H> {
   const handlers = cases as unknown as Record<string, ((input: unknown) => unknown) | undefined>
   if (result.ok) return handlers['ok']!(result.value) as Output<H>
 
