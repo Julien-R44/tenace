@@ -51,14 +51,14 @@ export {
   type PolicyOptions,
   type ReusablePolicy,
 } from './policy.ts'
-export { Result } from './result_namespace.ts'
+export { Result } from './result/namespace.ts'
 export {
   registerResult,
   type ResultAdapter,
   type ResultTypeName,
   type ResultTypes,
   unregisterResult,
-} from './result_registry.ts'
+} from './result/registry.ts'
 export { Bulkhead, type BulkheadOptions } from './strategies/bulkhead.ts'
 export { Chaos, type ChaosOptions } from './strategies/chaos.ts'
 export { Cache, type CacheOptions, type CacheProvider } from './strategies/cache.ts'

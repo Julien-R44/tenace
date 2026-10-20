@@ -4,7 +4,7 @@ import { TimeoutError } from '../errors.ts'
 import { raceSignal } from '../internal/race_signal.ts'
 import { reportError } from '../internal/report_error.ts'
 import { linkSignal } from '../internal/signal.ts'
-import { type AnyResult, err } from '../result.ts'
+import { type AnyResult, err } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface TimeoutOptions {

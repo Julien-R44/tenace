@@ -17,8 +17,8 @@ import type {
   OtherError,
   ValueOfReturn,
 } from './fold.ts'
-import { type AnyResult, err, type Result } from './result.ts'
-import { toResult } from './result_registry.ts'
+import { type AnyResult, err, type Result } from './result/core.ts'
+import { toResult } from './result/registry.ts'
 import { combine, type Attributes, type Instrumentation, withoutGlobal } from './instrumentation.ts'
 import { guardInstrumentation } from './internal/core_instrumentation.ts'
 import { diagnosticsChannel } from './internal/diagnostics_channel.ts'

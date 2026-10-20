@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
-import { type AnyResult, ok } from '../result.ts'
+import { type AnyResult, ok } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface StaleFallbackOptions {

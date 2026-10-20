@@ -1,6 +1,6 @@
 import type { CircuitRejectionState } from './errors.ts'
 import { reportError } from './internal/report_error.ts'
-import type { AnyResult } from './result.ts'
+import type { AnyResult } from './result/core.ts'
 import type { CircuitState } from './strategies/circuit_breaker/machine.ts'
 
 export type Attributes = Readonly<Record<string, string | number | boolean>>

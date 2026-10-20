@@ -1,6 +1,6 @@
 import type { UnexpectedError } from './errors.ts'
-import type { Err, Ok } from './result.ts'
-import type { ResultTypes } from './result_registry.ts'
+import type { Err, Ok } from './result/core.ts'
+import type { ResultTypes } from './result/registry.ts'
 import type { AnyOp, Op } from './strategy.ts'
 
 type Step<E, O> =

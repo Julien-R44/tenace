@@ -10,7 +10,7 @@ import {
 } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
 import { sleep } from '../src/internal/sleep.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Retry } from '../src/strategies/retry.ts'
 import { RetryBudget } from '../src/strategies/retry_budget.ts'
 import { Tenace } from '../src/tenace.ts'

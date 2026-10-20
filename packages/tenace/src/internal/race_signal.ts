@@ -1,5 +1,5 @@
 import { UnexpectedError } from '../errors.ts'
-import { type AnyResult, err } from '../result.ts'
+import { type AnyResult, err } from '../result/core.ts'
 
 interface Waiters {
   readonly callbacks: Set<() => void>

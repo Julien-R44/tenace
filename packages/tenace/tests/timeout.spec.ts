@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { TimeoutError } from '../src/errors.ts'
 import { systemClock } from '../src/clock.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Timeout } from '../src/strategies/timeout.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'

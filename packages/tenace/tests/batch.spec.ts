@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Tenace } from '../src/tenace.ts'
 import { NotFound } from './helpers/strategies.ts'
 

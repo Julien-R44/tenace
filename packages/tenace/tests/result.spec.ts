@@ -1,9 +1,9 @@
 import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
-import { err, isResult, ok } from '../src/result.ts'
+import { err, isResult, ok } from '../src/result/core.ts'
 import { Result } from '../src/result/index.ts'
-import type * as ResultModule from '../src/result.ts'
+import type * as ResultModule from '../src/result/core.ts'
 
 test.group('Result', () => {
   test('ok and err build plain branded objects', ({ assert }) => {
@@ -35,7 +35,7 @@ test.group('Result', () => {
   test('results from another copy of the module are recognized', async ({ assert }) => {
     const copy = (await import(
       // @ts-expect-error query string loads a second, independent copy of the module
-      '../src/result.ts?copy'
+      '../src/result/core.ts?copy'
     )) as typeof ResultModule
     assert.isTrue(isResult(copy.err('x')))
   })

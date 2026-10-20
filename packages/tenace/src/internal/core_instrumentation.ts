@@ -4,7 +4,7 @@ import {
   type Instrumentation,
   noopScope,
 } from '../instrumentation.ts'
-import type { AnyResult } from '../result.ts'
+import type { AnyResult } from '../result/core.ts'
 import { reportError } from './report_error.ts'
 
 type Outcome =

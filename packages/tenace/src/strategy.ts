@@ -1,5 +1,5 @@
 import type { ExecutionContext } from './context.ts'
-import type { AnyResult } from './result.ts'
+import type { AnyResult } from './result/core.ts'
 
 const STRATEGY_BRAND: unique symbol = Symbol.for('@julr/tenace/strategy') as never
 

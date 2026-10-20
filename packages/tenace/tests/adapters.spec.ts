@@ -9,7 +9,7 @@ import { bentocache } from '../src/adapters/bentocache.ts'
 import { rateLimiterFlexible } from '../src/adapters/rate_limiter_flexible.ts'
 import { verrou } from '../src/adapters/verrou.ts'
 import { LockNotAcquiredError, RateLimitError } from '../src/errors.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Tenace } from '../src/tenace.ts'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

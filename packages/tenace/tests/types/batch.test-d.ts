@@ -1,5 +1,5 @@
 import type { TimeoutError, UnexpectedError } from '../../src/errors.ts'
-import type { Result } from '../../src/result.ts'
+import type { Result } from '../../src/result/core.ts'
 import { Tenace } from '../../src/tenace.ts'
 import type { NotFound } from '../helpers/strategies.ts'
 import { type Equal, expectType } from './helpers.ts'

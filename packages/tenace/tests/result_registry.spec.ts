@@ -1,9 +1,9 @@
 import { test } from '@japa/runner'
 
 import { UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Result } from '../src/result/index.ts'
-import { registerResult, unregisterResult } from '../src/result_registry.ts'
+import { registerResult, unregisterResult } from '../src/result/registry.ts'
 import { Tenace } from '../src/tenace.ts'
 import { AppErr, AppOk } from './helpers/app_result.ts'
 import { NotFound } from './helpers/strategies.ts'

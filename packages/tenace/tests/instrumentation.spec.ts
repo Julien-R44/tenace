@@ -13,7 +13,7 @@ import {
   type TenaceEvent,
 } from '../src/instrumentation.ts'
 import type { EventMessage, ExecutionMessage } from '../src/internal/diagnostics_channel.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'

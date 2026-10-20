@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import type { ExecutionContext } from '../src/context.ts'
 import type { ExecutionScope, Instrumentation, TenaceEvent } from '../src/instrumentation.ts'
-import { type AnyResult, err, ok } from '../src/result.ts'
+import { type AnyResult, err, ok } from '../src/result/core.ts'
 import { type Next, Strategy } from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
 

@@ -1,7 +1,7 @@
 import type { Context, ExecutionContext } from '../context.ts'
 import type { GuardedTags, HandlerError, ValueOfReturn } from '../fold.ts'
-import { type AnyResult, err } from '../result.ts'
-import { toResult } from '../result_registry.ts'
+import { type AnyResult, err } from '../result/core.ts'
+import { toResult } from '../result/registry.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export type FallbackHandler<R = unknown> = (error: never, context: Context) => R

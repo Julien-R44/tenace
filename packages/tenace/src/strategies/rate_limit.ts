@@ -4,7 +4,7 @@ import { type Duration, toMs } from '../duration.ts'
 import { RateLimitError, UnexpectedError } from '../errors.ts'
 import { sleep } from '../internal/sleep.ts'
 import type { MaybePromise } from '../internal/types.ts'
-import { type AnyResult, err } from '../result.ts'
+import { type AnyResult, err } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface RateLimitDecision {

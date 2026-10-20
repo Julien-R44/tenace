@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { systemClock } from '../src/clock.ts'
 import { ExecutionContext } from '../src/context.ts'
-import { type AnyResult } from '../src/result.ts'
+import { type AnyResult } from '../src/result/core.ts'
 import { type Next, Strategy } from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'

@@ -2,7 +2,7 @@ import type { Clock } from './clock.ts'
 import type { Context } from './context.ts'
 import { linkSignal } from './internal/signal.ts'
 import type { AnyPolicy, Fn } from './policy.ts'
-import type { AnyResult } from './result.ts'
+import type { AnyResult } from './result/core.ts'
 
 export interface BatchOptions<P> {
   /**

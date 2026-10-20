@@ -1,4 +1,4 @@
-import { type AnyResult, isResult, ok } from './result.ts'
+import { type AnyResult, isResult, ok } from './core.ts'
 
 /**
  * Registry of foreign Result types, so a function returning your own Result type

@@ -8,7 +8,7 @@ import {
   type Ok,
   ok,
   type ValueOf,
-} from './result.ts'
+} from './core.ts'
 import {
   all,
   attempt,
@@ -17,7 +17,7 @@ import {
   type TryOptions,
   unwrap,
   unwrapErr,
-} from './result_helpers.ts'
+} from './helpers.ts'
 
 // module-level aliases: the namespace members below share the names of the imported types
 type OkOf<T> = Ok<T>

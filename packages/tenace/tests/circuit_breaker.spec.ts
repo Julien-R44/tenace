@@ -3,7 +3,7 @@ import { test } from '@japa/runner'
 import { backoff } from '../src/backoff.ts'
 import { CircuitOpenError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import type { CircuitState } from '../src/strategies/circuit_breaker/machine.ts'
 import {

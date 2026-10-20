@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ChaosError, TenaceError, UnexpectedError } from '../src/errors.ts'
 import { listener, type TenaceEvent } from '../src/instrumentation.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Chaos } from '../src/strategies/chaos.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'

@@ -4,7 +4,7 @@ import type {
   Instrumentation,
   TenaceEvent,
 } from '../instrumentation.ts'
-import type { AnyResult } from '../result.ts'
+import type { AnyResult } from '../result/core.ts'
 
 /**
  * Message of the `tracing:tenace:execution:*` channels. `result` is the final Tenace Result.

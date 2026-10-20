@@ -1,9 +1,9 @@
-import { UnexpectedError } from './errors.ts'
-import type { HandlerError, ValueOfReturn } from './fold.ts'
-import { isThenable } from './internal/thenable.ts'
-import { type AnyResult, err, type ErrorOfResult, ok, type Result, type ValueOf } from './result.ts'
-import { toResult } from './result_registry.ts'
-import type { ByTag, TagOf } from './types.ts'
+import { UnexpectedError } from '../errors.ts'
+import type { HandlerError, ValueOfReturn } from '../fold.ts'
+import { isThenable } from '../internal/thenable.ts'
+import { type AnyResult, err, type ErrorOfResult, ok, type Result, type ValueOf } from './core.ts'
+import { toResult } from './registry.ts'
+import type { ByTag, TagOf } from '../types.ts'
 
 type Settled<R, E> = Result<ValueOfReturn<R>, HandlerError<R> | E>
 

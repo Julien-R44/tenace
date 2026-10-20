@@ -1,5 +1,5 @@
-import type { AnyResult, ErrorOfResult, ValueOf } from './result.ts'
-import type { ByTag, TagOf } from './types.ts'
+import type { AnyResult, ErrorOfResult, ValueOf } from './core.ts'
+import type { ByTag, TagOf } from '../types.ts'
 
 type Cases<T, E> = { readonly ok: (value: T) => unknown } & {
   readonly [K in TagOf<E>]?: (error: ByTag<E, K>) => unknown

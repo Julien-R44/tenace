@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../context.ts'
 import { raceSignal } from '../internal/race_signal.ts'
-import type { AnyResult } from '../result.ts'
+import type { AnyResult } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 interface InFlight {

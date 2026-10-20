@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 
 import { TimeoutError, UnexpectedError } from '../src/errors.ts'
-import { err, ok } from '../src/result.ts'
+import { err, ok } from '../src/result/core.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'
 import { BoomError, Explode, NotFound } from './helpers/strategies.ts'

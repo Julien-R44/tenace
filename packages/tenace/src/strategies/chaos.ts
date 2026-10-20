@@ -2,7 +2,7 @@ import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { ChaosError, UnexpectedError } from '../errors.ts'
 import { sleep } from '../internal/sleep.ts'
-import { type AnyResult, err, ok } from '../result.ts'
+import { type AnyResult, err, ok } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 
 export interface ChaosOptions<E = never, V = never> {

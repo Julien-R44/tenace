@@ -1,8 +1,8 @@
 import { test } from '@japa/runner'
 
 import { TenaceError, UnexpectedError } from '../src/errors.ts'
-import { match } from '../src/match.ts'
-import { err, ok, type Result } from '../src/result.ts'
+import { match } from '../src/result/match.ts'
+import { err, ok, type Result } from '../src/result/core.ts'
 
 class NotFound extends TenaceError {
   readonly _tag = 'NotFound' as const

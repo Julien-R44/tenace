@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ExecutionContext } from '../src/context.ts'
 import { UnexpectedError } from '../src/errors.ts'
-import { type AnyResult, err, isResult, ok } from '../src/result.ts'
+import { type AnyResult, err, isResult, ok } from '../src/result/core.ts'
 import type * as PolicyModule from '../src/policy.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import type * as BreakerModule from '../src/strategies/circuit_breaker/circuit_breaker.ts'

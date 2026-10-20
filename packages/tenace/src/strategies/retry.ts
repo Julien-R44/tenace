@@ -1,7 +1,7 @@
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { sleep, yieldToEventLoop } from '../internal/sleep.ts'
-import type { AnyResult } from '../result.ts'
+import type { AnyResult } from '../result/core.ts'
 import { type Next, Strategy } from '../strategy.ts'
 import type { TagOf } from '../types.ts'
 import { backoff } from '../backoff.ts'

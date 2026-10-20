@@ -1,7 +1,7 @@
 import { TenaceError, type TimeoutError, type UnexpectedError } from '../../src/errors.ts'
 import type { OtherError } from '../../src/fold.ts'
 import type { ErrorOf } from '../../src/policy.ts'
-import { err, ok, type Result } from '../../src/result.ts'
+import { err, ok, type Result } from '../../src/result/core.ts'
 import { Tenace } from '../../src/tenace.ts'
 import { Explode, NotFound, type BoomError } from '../helpers/strategies.ts'
 import { type Equal, expectType } from './helpers.ts'

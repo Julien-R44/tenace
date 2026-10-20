@@ -1,6 +1,6 @@
 import type { ExecutionContext } from '../../src/context.ts'
 import { TenaceError } from '../../src/errors.ts'
-import { type AnyResult, err, ok } from '../../src/result.ts'
+import { type AnyResult, err, ok } from '../../src/result/core.ts'
 import { type Next, Strategy } from '../../src/strategy.ts'
 
 export class BoomError extends TenaceError {

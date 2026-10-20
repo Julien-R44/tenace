@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 
 import { ExecutionContext } from '../src/context.ts'
 import { BulkheadFullError, UnexpectedError } from '../src/errors.ts'
-import { type AnyResult, ok } from '../src/result.ts'
+import { type AnyResult, ok } from '../src/result/core.ts'
 import { Bulkhead } from '../src/strategies/bulkhead.ts'
 import { Tenace } from '../src/tenace.ts'
 import { TestClock } from '../src/testing/test_clock.ts'

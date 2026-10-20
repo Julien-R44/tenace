@@ -1,5 +1,5 @@
 import { TenaceError, UnexpectedError } from '../../src/errors.ts'
-import { match } from '../../src/match.ts'
+import { match } from '../../src/result/match.ts'
 import { type Duration, toMs } from '../../src/duration.ts'
 import {
   err,
@@ -8,7 +8,7 @@ import {
   type Ok,
   type Result,
   type ValueOf,
-} from '../../src/result.ts'
+} from '../../src/result/core.ts'
 import type { ByTag, TagOf } from '../../src/types.ts'
 import { Result as NS } from '../../src/result/index.ts'
 import { assertType, type Equal, expectType } from './helpers.ts'
