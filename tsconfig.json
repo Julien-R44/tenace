@@ -5,5 +5,5 @@
     "declaration": false,
     "isolatedDeclarations": false
   },
-  "include": ["scripts", "*.config.ts"]
+  "include": ["scripts", "*.config.ts", "docs/*.d.ts"]
 }
