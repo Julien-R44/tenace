@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [`6d3bfd8`](https://github.com/Julien-R44/tenace/commit/6d3bfd87f7fdb6ac025b733ec58b8ac58b19bae7) Thanks [@Julien-R44](https://github.com/Julien-R44)! - Tenace 2: typed errors, `execute()` and `settle()`, and no runtime dependencies. See the notes below for everything that changed.
+
 Tenace 2 is a rewrite. The library no longer wraps cockatiel and has no runtime dependencies. The API changed everywhere: see [Breaking changes](#breaking-changes) below.
 
 ### Highlights
