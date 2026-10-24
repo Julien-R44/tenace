@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1
+
+### Patch Changes
+
+- [#2](https://github.com/Julien-R44/tenace/pull/2) [`869f954`](https://github.com/Julien-R44/tenace/commit/869f954e5a52c36281fed10e3f28b5dc84d5e5c7) Thanks [@Julien-R44](https://github.com/Julien-R44)! - Duration strings support long unit names, spaces, case-insensitive aliases, weeks, years, and unitless milliseconds. Parsing uses code adapted from `@lukeed/ms` under the MIT license, with no runtime dependency.
+
+  `Duration` accepts `string | number`, including values read from configuration. Strings such as `'0s'`, `'+1s'`, and `'1e3ms'` are valid. Negative, malformed, and overflowing string durations throw a `RangeError`.
+
 ## 2.0.0
 
 ### Major Changes
