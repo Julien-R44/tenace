@@ -129,7 +129,7 @@ To type a parameter that receives a policy, see [Type a policy parameter](/conce
 
 Every duration option accepts numeric milliseconds or a string. Strings accept the short units `ms`, `s`, `m`, `h`, `d`, `w`, and `y`, long names such as `'250 milliseconds'` or `'10 seconds'`, and aliases such as `'2.5 hrs'`. Unit names are case-insensitive and may be separated from the number by spaces. Strings without a unit, such as `'100'`, are milliseconds. A year is 365.25 days.
 
-The v2 forms `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'` remain supported. `toMs(duration)` converts a duration to milliseconds. It throws a `RangeError` for a negative, `NaN`, or malformed duration, or when a string overflows to infinity. Numeric `Infinity` is accepted and means never. `Duration` accepts `string | number`, so values read from configuration do not need a literal type assertion.
+Strings also accept `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'`. `toMs(duration)` converts a duration to milliseconds. It throws a `RangeError` for a negative, `NaN`, or malformed duration, or when a string overflows to infinity. Numeric `Infinity` is accepted and means never. `Duration` accepts `string | number`, including values read from configuration.
 
 ## Clock
 

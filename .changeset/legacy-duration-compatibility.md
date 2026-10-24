@@ -2,6 +2,6 @@
 '@julr/tenace': patch
 ---
 
-Restore the duration strings accepted before v2, including long unit names, spaces, case-insensitive aliases, weeks, years, and numeric strings interpreted as milliseconds. Adapt the MIT-licensed parser from `@lukeed/ms` without adding a runtime dependency.
+Duration strings support long unit names, spaces, case-insensitive aliases, weeks, years, and unitless milliseconds. Parsing uses code adapted from `@lukeed/ms` under the MIT license, with no runtime dependency.
 
-Widen `Duration` to `string | number` so duration values read from configuration remain assignable. Preserve the existing v2 forms, including `'0s'`, `'+1s'`, and `'1e3ms'`, and keep rejecting negative, malformed, and overflowing string durations.
+`Duration` accepts `string | number`, including values read from configuration. Strings such as `'0s'`, `'+1s'`, and `'1e3ms'` are valid. Negative, malformed, and overflowing string durations throw a `RangeError`.
