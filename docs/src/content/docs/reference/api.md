@@ -127,7 +127,9 @@ To type a parameter that receives a policy, see [Type a policy parameter](/conce
 
 ## Durations
 
-Every duration option accepts a number of milliseconds or a string with one unit: `ms`, `s`, `m`, `h`, or `d`. The number of a string is a non-negative decimal, and `'+1s'`, `'5.s'`, and `'1e3ms'` are accepted too. `toMs(duration)` converts a duration to milliseconds. It throws a `RangeError` for a negative, `NaN`, or malformed duration. `Infinity` is accepted and means never.
+Every duration option accepts numeric milliseconds or a string. Strings accept the short units `ms`, `s`, `m`, `h`, `d`, `w`, and `y`, long names such as `'250 milliseconds'` or `'10 seconds'`, and aliases such as `'2.5 hrs'`. Unit names are case-insensitive and may be separated from the number by spaces. Strings without a unit, such as `'100'`, are milliseconds. A year is 365.25 days.
+
+Strings also accept `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'`. `toMs(duration)` converts a duration to milliseconds. It throws a `RangeError` for a negative, `NaN`, or malformed duration, or when a string overflows to infinity. Numeric `Infinity` is accepted and means never. `Duration` accepts `string | number`, including values read from configuration.
 
 ## Clock
 

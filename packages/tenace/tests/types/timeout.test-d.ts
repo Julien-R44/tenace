@@ -18,7 +18,8 @@ expectType<
   Equal<typeof result, Result<{ id: string }, NotFound | UnexpectedError | TimeoutError>>
 >()
 
-// @ts-expect-error unknown unit
+declare const configuredDuration: string
+Tenace.policy().withTimeout(configuredDuration)
 Tenace.policy().withTimeout('1 sec')
 // @ts-expect-error unknown mode
 Tenace.policy().withTimeout(1, { mode: 'lazy' })
