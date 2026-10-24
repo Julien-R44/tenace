@@ -14,5 +14,6 @@ await Tenace.waitFor(() => true, { interval: attempt => `${attempt}s` })
 
 // @ts-expect-error the condition returns a boolean
 await Tenace.waitFor(() => 'ready')
-// @ts-expect-error unknown unit
+declare const configuredDuration: string
+await Tenace.waitFor(() => true, { interval: configuredDuration, timeout: configuredDuration })
 await Tenace.waitFor(() => true, { timeout: '1 min' })

@@ -96,10 +96,13 @@ declare const opaque: Result<User, unknown>
 Result.match(opaque, { ok: () => 0 })
 
 /* ---- durations ---- */
-const durations: Duration[] = [100, '100ms', '1.5s', '2m', '1h', '1d']
+const durations: Duration[] = [100, '100ms', '1.5s', '2m', '1h', '1d', '10 seconds', '2w', '100']
 void durations
-// @ts-expect-error unknown unit
+declare const configuredDuration: string
+toMs(configuredDuration)
 toMs('10sec')
+// @ts-expect-error durations must be numbers or strings
+toMs(true)
 
 /* ---- match infers the union of a function with several returns ---- */
 function signup(email: string) {
