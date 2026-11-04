@@ -3,7 +3,7 @@ title: Runtimes
 description: Where Tenace runs, and what depends on the runtime.
 ---
 
-Tenace is ESM only and has no runtime dependencies. It runs on:
+Tenace is ESM only. Its one runtime dependency is [`temporal-polyfill`](https://github.com/fullcalendar/temporal-polyfill), for runtimes without a native `Temporal`. It runs on:
 
 | Runtime            | Version                                  |
 | ------------------ | ---------------------------------------- |
@@ -23,5 +23,6 @@ The package has no static `node:` import. Two features depend on the runtime:
 
 - **`diagnostics_channel`.** Tenace loads it with `process.getBuiltinModule()` the first time an execution runs. Where it is missing, such as Workers without `nodejs_compat`, nothing is published and nothing fails. See [diagnostics_channel](/observability/diagnostics-channel/).
 - **Timers.** The system clock uses the global `setTimeout` and `clearTimeout`, which every supported runtime provides. It chains them for delays beyond their limit of 2^31 - 1 ms.
+- **Temporal.** `clock.now()` returns a `Temporal.Instant`: the native one on Node.js 26 and Bun, the `temporal-polyfill` ponyfill on Node.js 22 and 24 and on Workers. The ponyfill is not installed on `globalThis`.
 
 The `@julr/tenace-otel` package depends only on `@opentelemetry/api`, and runs wherever an OpenTelemetry SDK does.

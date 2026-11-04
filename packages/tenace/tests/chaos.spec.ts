@@ -6,7 +6,7 @@ import { Result } from '../src/result/namespace.ts'
 import { Chaos } from '../src/strategies/chaos.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 class Injected extends TenaceError {
   readonly _tag = 'Injected' as const
@@ -65,21 +65,21 @@ test.group('Chaos', () => {
   })
 
   test('adds latency, then calls fn', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const done = Tenace.policy()
       .withChaos({ latency: '1s' })
-      .execute(() => clock.now(), { clock })
-    await clock.advance(1000)
+      .execute(() => clock.monotonic(), { clock })
+    await time.advanceBy(1000)
     assert.equal(await done, 1000)
   })
 
   test('latency combined with a timeout produces timeouts', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const done = Tenace.policy()
       .withChaos({ latency: '2s' })
       .withTimeout('1s')
       .settle(() => 'never', { clock })
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     const result = await done
     assert.isTrue(!result.ok && (result.error as { _tag?: string })._tag === 'TimeoutError')
   })
@@ -157,7 +157,7 @@ test.group('Idempotency', () => {
   })
 
   test('calls rejected before running are still retried', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const breaker = new CircuitBreaker({ trip: { consecutive: 1 }, openFor: 100, clock })
     const policy = Tenace.policy<Injected>()
       .with(breaker)
@@ -166,7 +166,7 @@ test.group('Idempotency', () => {
 
     let calls = 0
     const settled = policy.settle(() => ++calls, { clock, idempotent: false })
-    await clock.advance(100)
+    await time.advanceBy(100)
     assert.deepEqual(await settled, Result.ok(1))
 
     const strict = Tenace.policy<Injected>()
@@ -184,7 +184,7 @@ test.group('Idempotency', () => {
     assert.deepEqual(failed, Result.err(down))
     assert.equal(strictCalls, 1)
     const retried = strict.settle(() => 'x', { clock })
-    await clock.advance(100)
+    await time.advanceBy(100)
     assert.deepEqual(await retried, Result.ok('x'))
   })
 

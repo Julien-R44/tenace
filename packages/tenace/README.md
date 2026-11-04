@@ -32,7 +32,7 @@ Remove `withCircuitBreaker()` and the `CircuitOpenError` handler becomes a type 
 npm install @julr/tenace
 ```
 
-Tenace is ESM only and has no runtime dependencies. It runs on Node.js 22.18 or later, Bun, and Cloudflare Workers.
+Tenace is ESM only. Its one runtime dependency is `temporal-polyfill`, for runtimes without a native `Temporal`. It runs on Node.js 22.18 or later, Bun, and Cloudflare Workers.
 
 ## Why Tenace
 
@@ -41,7 +41,7 @@ Tenace is ESM only and has no runtime dependencies. It runs on Node.js 22.18 or 
 - **A small Result type, for your code too.** Tenace passes Results through every layer, and you can return them from your own services without a policy: `Result.ok()`, `Result.err()`, `Result.match()`, and `Result.try()`. See [Result pattern](https://tenace.julr.dev/concepts/result-pattern/).
 - **Composable.** `.with()` adds a strategy or inlines another policy. Policies are immutable, and a circuit breaker or bulkhead used by several policies is shared between them. Write your own strategy by extending `Strategy`.
 - **Safe defaults.** Timeouts abort the `signal` your function receives. Retries back off with jitter, honor `Retry-After`, can share a budget against retry storms, and skip calls that must not run twice.
-- **Testable.** `TestClock` drives timeouts, retry delays and open circuits without waiting. Chaos injects latency and faults into one policy, or into all of them.
+- **Testable.** `clock.fake()` drives timeouts, retry delays and open circuits without waiting. Chaos injects latency and faults into one policy, or into all of them.
 - **Observable without lock-in.** One instrumentation interface sees every execution, attempt and event. Plug in your logger, `node:diagnostics_channel`, or OpenTelemetry with [`@julr/tenace-otel`](https://www.npmjs.com/package/@julr/tenace-otel).
 - **Small.** One module per source file, so bundlers keep only what you import.
 
@@ -153,27 +153,26 @@ const results = await Tenace.map(ids, userId => getUser(userId), {
 ### Wait for a condition
 
 ```ts
-import { waitFor } from '@julr/tenace'
+import { clock } from '@julr/tenace'
 
 declare const healthUrl: string
 
-await waitFor(async ({ signal }) => (await fetch(healthUrl, { signal })).ok, {
-  interval: '500ms',
-  timeout: '30s',
-})
+const healthy = await clock.until(
+  async signal => ((await fetch(healthUrl, { signal })).ok ? true : undefined),
+  { within: '30s', every: '500ms' },
+) // true, or null after 30 seconds
 ```
 
 ### Test without waiting
 
 ```ts
-import { Tenace } from '@julr/tenace'
-import { TestClock } from '@julr/tenace/testing'
+import { clock, Tenace } from '@julr/tenace'
 
-const clock = new TestClock()
+using time = clock.fake()
 const policy = Tenace.policy().withTimeout('1s').withRetry({ retries: 2, delay: '10s' })
 
-const done = policy.settle(() => new Promise<string>(() => {}), { clock })
-await clock.runAll() // 3 timeouts and 2 delays, without waiting 23 seconds
+const done = policy.settle(() => new Promise<string>(() => {}))
+await time.runAll() // 3 timeouts and 2 delays, without waiting 23 seconds
 const result = await done // a TimeoutError
 ```
 

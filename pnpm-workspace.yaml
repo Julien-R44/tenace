@@ -30,6 +30,7 @@ catalog:
   rate-limiter-flexible: ^11.2.3
   rolldown: ^1.2.14
   satori: ^0.63.0
+  temporal-polyfill: ^1.0.6
   tsdown: ^0.23.1
   typescript: ^7.0.2
   typescript-5: npm:typescript@^5.9.3

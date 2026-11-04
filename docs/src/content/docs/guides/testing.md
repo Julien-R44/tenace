@@ -1,51 +1,52 @@
 ---
 title: Test your policies
-description: Drive time with TestClock, inject faults with chaos, and assert on events.
+description: Drive time with a fake clock, inject faults with chaos, and assert on events.
 ---
 
-Policies wait for timeouts, retry delays, and open circuits. A test that waits for real time is slow and flaky. Tenace lets you replace the clock with a `TestClock` that moves only when you tell it to.
+Policies wait for timeouts, retry delays, and open circuits. A test that waits for real time is slow and flaky. Every policy reads the time from a clock, and `clock.fake()` replaces it with a time that moves only when you tell it to.
 
-## Control time with TestClock
+## Control time with clock.fake()
 
-Import `TestClock` from `@julr/tenace/testing` and pass it to the execution:
+Fake the shared `clock` exported by `@julr/tenace`. Every policy reads it, so the timeouts, the retry delays, and the circuit breakers follow the same fake time:
 
 ```ts
-import { Tenace } from '@julr/tenace'
-import { TestClock } from '@julr/tenace/testing'
+import { clock, Tenace } from '@julr/tenace'
 
-const clock = new TestClock()
+using time = clock.fake()
 const policy = Tenace.policy().withTimeout('1s').withRetry({ retries: 2, delay: '100ms' })
 
 // start the execution, then move time
-const done = policy.settle(() => new Promise(() => {}), { clock })
-await clock.runAll()
+const done = policy.settle(() => new Promise(() => {}))
+await time.runAll()
 
 const result = await done // a TimeoutError, after three attempts
 ```
 
-`TestClock` has these methods:
+`using` restores the system time at the end of the scope. Without it, call `clock.restore()`.
 
-| Member                    | Description                                                                                                                 |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `new TestClock(startAt?)` | Starts at `startAt` milliseconds since the epoch, 0 by default.                                                             |
-| `now()`                   | The current time of the clock.                                                                                              |
-| `advance(duration)`       | Moves time forward by a finite duration and fires the due timers in order. Returns a promise.                               |
-| `runAll(limit?)`          | Fires every timer, including the timers they schedule, until none is left. Rejects after `limit` timers, 10,000 by default. |
-| `pendingTimers`           | The number of timers waiting to fire.                                                                                       |
+`clock.fake(at?)` freezes the calendar time at `at`, a `Date` or a `Temporal.Instant`, or at the current time. It returns a `FakeClock`:
 
-`advance()` lets pending promise callbacks run between timers, so a timer scheduled after another one fires within the same call. It also lets a retry without delay go on after it yields to the event loop, every 100 retries. Always `await` it. It takes a number of milliseconds or a string such as `'30s'`, and rejects with a `RangeError` for a negative, `NaN`, or infinite duration. A timer of `Infinity` never fires, not even with `runAll()`.
+| Member                | Description                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `advanceBy(duration)` | Moves time forward by a finite duration and fires the due timers in order. Returns a promise.                               |
+| `runAll(limit?)`      | Fires every timer, including the timers they schedule, until none is left. Rejects after `limit` timers, 10,000 by default. |
+| `setTime(at)`         | Moves the calendar time only, as a system clock adjustment does. No timer fires.                                            |
+| `letTimePass()`       | From now on, each wait ends at once. Use it when the code under test does real I/O between two waits.                       |
+| `nextWait()`          | Resolves when the next wait starts.                                                                                         |
+| `pendingTimers`       | The number of waits and deadlines waiting to fire.                                                                          |
+| `pendingDeadlines`    | The number of deadlines that neither ended nor were disposed.                                                               |
 
-### Which strategies follow the execution clock
+`advanceBy()` lets pending promise callbacks run between timers, so a timer scheduled after another one fires within the same call. It also lets a retry without delay go on after it yields to the event loop, every 100 retries. Always `await` it. It takes a number of milliseconds or a string such as `'30s'`, and rejects with a `RangeError` for a negative, `NaN`, or infinite duration. A timer of `Infinity` never fires, not even with `runAll()`.
 
-The `clock` option of `execute()`, `settle()`, and batches reaches timeouts, retry delays, bulkhead and lock waits, chaos latency, rate limits, retry budgets, and the ages of a stale fallback. `RateLimit` and `RetryBudget` accept their own `clock` option, which takes precedence.
+### Give a test its own clock
 
-A `CircuitBreaker` reads the time from its own `clock` option only, because its circuit is shared by every execution. Pass it the same clock:
+Faking the shared clock fakes it for the whole process. To keep a test apart, for example when tests run concurrently, create a `Clock` and pass it to the execution:
 
 ```ts
-import { CircuitBreaker, Tenace } from '@julr/tenace'
-import { TestClock } from '@julr/tenace/testing'
+import { CircuitBreaker, Clock, Tenace } from '@julr/tenace'
 
-const clock = new TestClock()
+const clock = new Clock()
+using time = clock.fake()
 const breaker = new CircuitBreaker({ trip: { consecutive: 2 }, openFor: '30s', clock })
 const policy = Tenace.policy().with(breaker)
 
@@ -54,9 +55,11 @@ await policy.settle(failing, { clock })
 await policy.settle(failing, { clock })
 console.log(breaker.state) // 'open'
 
-await clock.advance(30_000)
+await time.advanceBy('30s')
 console.log(breaker.state) // 'half-open'
 ```
+
+The `clock` option of `execute()`, `settle()`, and batches reaches timeouts, retry delays, bulkhead and lock waits, chaos latency, rate limits, retry budgets, and the ages of a stale fallback. `RateLimit` and `RetryBudget` accept their own `clock` option, which takes precedence. A `CircuitBreaker` reads the time from its own `clock` option only, because its circuit is shared by every execution.
 
 ## Make randomness predictable
 

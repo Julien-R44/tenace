@@ -65,6 +65,9 @@
     "test:bun": "bun --conditions=tenace-source bin/test.ts",
     "prepublishOnly": "pnpm build"
   },
+  "dependencies": {
+    "temporal-polyfill": "catalog:"
+  },
   "devDependencies": {
     "@japa/assert": "catalog:",
     "@japa/runner": "catalog:",

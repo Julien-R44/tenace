@@ -49,7 +49,7 @@ export class StaleFallback extends Strategy {
       )
     }
     const result = await next(context)
-    const now = context.clock.now()
+    const now = context.clock.monotonic()
 
     if (result.ok) {
       this.#values.delete(key)

@@ -9,7 +9,7 @@ import type * as BreakerModule from '../src/strategies/circuit_breaker/circuit_b
 import { isStrategy, type Next, Strategy } from '../src/strategy.ts'
 import type * as StrategyModule from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 import {
   BoomError,
   Counter,
@@ -252,7 +252,7 @@ test.group('Policy | context', () => {
   })
 
   test('the clock option reaches strategies and the function', async ({ assert }) => {
-    const clock = new TestClock(500)
+    const { clock } = fakeClock(500)
     const seen = await Tenace.policy().execute(ctx => (ctx as ExecutionContext).clock, { clock })
     assert.strictEqual(seen, clock)
   })

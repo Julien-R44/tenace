@@ -5,26 +5,25 @@ description: The Tenace entry point, the Policy methods, execution options, and 
 
 ## Entry points
 
-| Import path                                   | Exports                                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `@julr/tenace`                                | `Tenace`, the strategies, the errors, `ok`, `err`, `match`, `backoff`, the instrumentation helpers, and the types. |
-| `@julr/tenace/testing`                        | `TestClock`                                                                                                        |
-| `@julr/tenace/adapters/rate-limiter-flexible` | `rateLimiterFlexible`                                                                                              |
-| `@julr/tenace/adapters/verrou`                | `verrou`                                                                                                           |
-| `@julr/tenace/adapters/bentocache`            | `bentocache`                                                                                                       |
-| `@julr/tenace-otel`                           | `openTelemetry`, `errorType`                                                                                       |
+| Import path                                   | Exports                                                                                                                                 |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `@julr/tenace`                                | `Tenace`, the strategies, the errors, `ok`, `err`, `match`, `backoff`, `Clock` and `clock`, the instrumentation helpers, and the types. |
+| `@julr/tenace/testing`                        | `FakeClock`                                                                                                                             |
+| `@julr/tenace/adapters/rate-limiter-flexible` | `rateLimiterFlexible`                                                                                                                   |
+| `@julr/tenace/adapters/verrou`                | `verrou`                                                                                                                                |
+| `@julr/tenace/adapters/bentocache`            | `bentocache`                                                                                                                            |
+| `@julr/tenace-otel`                           | `openTelemetry`, `errorType`                                                                                                            |
 
 ## Tenace
 
-| Method                                   | Returns         | Description                                                                               |
-| ---------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
-| `Tenace.policy<E>(options?)`             | `Policy`        | A reusable policy. `E` declares errors the functions may return, for the callbacks.       |
-| `Tenace.call(fn, options?)`              | `Policy`        | A policy bound to `fn`. Throws a `TypeError` when `fn` is not a function.                 |
-| `Tenace.all(tasks, options?)`            | `Batch`         | Runs `tasks` through a policy. See [Batches](/guides/batches/).                           |
-| `Tenace.map(items, fn, options?)`        | `Batch`         | Runs `fn(item, context, index)` for each item through a policy.                           |
-| `Tenace.instrument(...instrumentations)` | `() => void`    | Sets the default instrumentation. Returns a function that removes this setting.           |
-| `Tenace.chaos(options)`                  | `() => void`    | Injects faults around every function call. Returns a function that removes this setting.  |
-| `Tenace.waitFor(condition, options?)`    | `Promise<void>` | Calls `condition` until it returns `true`. See [Wait for a condition](/guides/wait-for/). |
+| Method                                   | Returns      | Description                                                                              |
+| ---------------------------------------- | ------------ | ---------------------------------------------------------------------------------------- |
+| `Tenace.policy<E>(options?)`             | `Policy`     | A reusable policy. `E` declares errors the functions may return, for the callbacks.      |
+| `Tenace.call(fn, options?)`              | `Policy`     | A policy bound to `fn`. Throws a `TypeError` when `fn` is not a function.                |
+| `Tenace.all(tasks, options?)`            | `Batch`      | Runs `tasks` through a policy. See [Batches](/guides/batches/).                          |
+| `Tenace.map(items, fn, options?)`        | `Batch`      | Runs `fn(item, context, index)` for each item through a policy.                          |
+| `Tenace.instrument(...instrumentations)` | `() => void` | Sets the default instrumentation. Returns a function that removes this setting.          |
+| `Tenace.chaos(options)`                  | `() => void` | Injects faults around every function call. Returns a function that removes this setting. |
 
 The functions returned by `Tenace.instrument()` and `Tenace.chaos()` can be called in any order: the active setting is the latest one not removed yet.
 
@@ -74,7 +73,7 @@ See [execute() and settle()](/concepts/execute-and-settle/).
 | Option       | Type          | Default         | Description                                                                                                           |
 | ------------ | ------------- | --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `signal`     | `AbortSignal` |                 | Aborting it stops the execution. The promise rejects with `signal.reason`, without running `fn` when already aborted. |
-| `clock`      | `Clock`       | `systemClock`   | Clock of the time-based strategies of this execution. See [Testing](/guides/testing/).                                |
+| `clock`      | `Clock`       | `clock`         | Clock of the time-based strategies of this execution. See [Testing](/guides/testing/).                                |
 | `name`       | `string`      | the policy name | Operation name reported to instrumentation.                                                                           |
 | `key`        | `string`      |                 | Key of the execution. See [Keys](/concepts/keys/).                                                                    |
 | `idempotent` | `boolean`     | `true`          | `false` when running the function twice is not safe. See [Idempotency](/strategies/retry/#idempotency).               |
@@ -133,12 +132,18 @@ Strings also accept `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'`. `toMs(duration)` co
 
 ## Clock
 
-```ts nocheck
-interface Clock {
-  now(): number
-  setTimeout(callback: () => void, ms: number): TimerHandle
-  clearTimeout(handle: TimerHandle): void
-}
-```
+Every policy reads the time from a `Clock`: the shared `clock` exported by `@julr/tenace`, or the one passed to `execute(fn, { clock })`.
 
-`setTimeout()` must accept delays longer than the timer limit of the platform, and never fire a timer of `Infinity`. `systemClock` uses `Date.now()` and the global timers, and chains timers for delays longer than about 24.8 days. `TestClock` from `@julr/tenace/testing` moves only when you tell it to.
+| Member                    | Returns                   | Description                                                                                                   |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `now()`                   | `Temporal.Instant`        | The calendar time, for dates stored or shown to users. Circuit breakers and rate limit stores read it.        |
+| `monotonic()`             | `number`                  | Milliseconds on a clock that only moves forward, for durations. Compare two readings only.                    |
+| `wait(duration, signal?)` | `Promise<void>`           | Resolves once the duration passes. Rejects with an `AbortError` when the signal aborts.                       |
+| `timeout(duration)`       | `{ signal } & Disposable` | A deadline whose signal aborts with a `TimeoutError` once the duration passes. Dispose it when the work ends. |
+| `until(observe, options)` | `Promise<T \| null>`      | Observes until a value comes. See [Wait for a condition](/guides/wait-for/).                                  |
+| `fake(at?)`               | `FakeClock`               | Replaces the system time with a fake one. See [Testing](/guides/testing/).                                    |
+| `restore()`               | `void`                    | Goes back to the system time.                                                                                 |
+
+`Temporal` is the native API where the runtime has one, such as Node.js 26 and Bun, and the [`temporal-polyfill`](https://github.com/fullcalendar/temporal-polyfill) ponyfill elsewhere. The ponyfill is not installed on `globalThis`.
+
+The system time uses the global timers, and chains them for delays longer than about 24.8 days. A wait or a deadline of `Infinity` never ends.

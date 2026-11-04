@@ -233,6 +233,9 @@ catalogs:
     satori:
       specifier: ^0.63.0
       version: 0.63.0
+    temporal-polyfill:
+      specifier: ^1.0.6
+      version: 1.0.6
     tsdown:
       specifier: ^0.23.1
       version: 0.23.1
@@ -349,6 +352,10 @@ importers:
         version: typescript@5.9.3
 
   packages/tenace:
+    dependencies:
+      temporal-polyfill:
+        specifier: 'catalog:'
+        version: 1.0.6
     devDependencies:
       '@japa/assert':
         specifier: 'catalog:'
@@ -4280,6 +4287,15 @@ packages:
   tagged-tag@1.0.0:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
+
+  temporal-polyfill@1.0.6:
+    resolution: {integrity: sha512-tYyEry1HLGUDbm2356W3iYD0OZdo7rlP7h98Zr/EnjqLZQwTAfcBDUvJnJbfA15v/vQad57hJZScG5O0W2oKEA==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.3:
+    resolution: {integrity: sha512-9jbTSX3HvkOWvDpNpFzwX/d1mkCrgQgwLmVTOEiuocZGKHsrQJtttGZFmybJ2zYP5zCSZuU5ZyeS8+eOEPABiQ==}
 
   tempura@0.4.1:
     resolution: {integrity: sha512-NQ4Cs23jM6UUp3CcS5vjmyjTC6dtA5EsflBG2cyG0wZvP65AV26tJ920MGvTRYIImCY13RBpOhc7q4/pu+FG5A==}
@@ -8492,6 +8508,15 @@ snapshots:
       sax: 1.6.1
 
   tagged-tag@1.0.0: {}
+
+  temporal-polyfill@1.0.6:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.3
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.3: {}
 
   tempura@0.4.1: {}
 

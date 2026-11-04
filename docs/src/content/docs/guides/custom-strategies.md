@@ -68,7 +68,7 @@ const policy = Tenace.policy()
 - **Return failures, do not throw them.** `execute()` must resolve to a `Result`. A throw is a bug, and the execution rejects with the thrown value, from `settle()` too.
 - **Derive the context, do not mutate it.** `ExecutionContext` is frozen. `context.with({ ... })` returns a new context with a different `signal`, `attempt`, `key`, `clock`, or `idempotent` flag, for the inner steps.
 - **Respect the signal.** Stop waiting when `context.signal` aborts, and check `context.signal.aborted` before you start new work. When `context.abortable` is `false`, nothing can abort it and you can skip the listener. A context derived with a new `signal` is abortable.
-- **Use the execution clock.** Wait with `context.clock.setTimeout()` and read the time with `context.clock.now()`, so the strategy works with a [`TestClock`](/guides/testing/).
+- **Use the execution clock.** Wait with `context.clock.wait()` or `context.clock.timeout()`, and measure durations with `context.clock.monotonic()`, so the strategy follows a [fake clock](/guides/testing/).
 - **Report events.** `context.emit({ type: 'custom', name, attributes })` sends an event to the instrumentation of the execution. `context.observed` is `false` when nothing listens, so you can skip building an expensive event.
 
 ## Share state on purpose

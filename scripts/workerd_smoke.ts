@@ -1,7 +1,8 @@
 /**
  * Bundles a worker importing the built @julr/tenace package, as Wrangler would, and runs it
  * inside workerd (through Miniflare), with and without nodejs_compat, to check the core
- * stays runtime agnostic.
+ * stays runtime agnostic. workerd has no native Temporal, so the clock runs on the
+ * temporal-polyfill ponyfill.
  */
 import { fileURLToPath } from 'node:url'
 
@@ -10,10 +11,14 @@ import { rolldown } from 'rolldown'
 
 const packages = {
   '@julr/tenace': fileURLToPath(new URL('../packages/tenace/build/index.js', import.meta.url)),
+  '@julr/tenace/testing': fileURLToPath(
+    new URL('../packages/tenace/build/testing/index.js', import.meta.url),
+  ),
 }
 
 const worker = `
-import { Result, Tenace, TimeoutError, backoff } from '@julr/tenace'
+import { CircuitBreaker, Result, Tenace, TimeoutError, backoff, clock } from '@julr/tenace'
+import { FakeClock } from '@julr/tenace/testing'
 
 export default {
   async fetch() {
@@ -35,11 +40,48 @@ export default {
     const timeout = await Tenace.policy().withTimeout(5).settle(() => new Promise(() => {}))
     const batch = await Tenace.map([1, 2, 3], n => (n === 2 ? Result.err('two') : n), { concurrency: 2 }).settle()
 
+    // the system clock
+    const now = clock.now()
+    let observations = 0
+    const polled = await clock.until(() => (++observations === 3 ? 'ready' : undefined), {
+      within: '1s',
+      every: 5,
+    })
+
+    // one fake drives the timeouts, the retry delays and the circuit breaker
+    const time = clock.fake(new Date('2026-01-01T00:00:00Z'))
+    let faked
+    try {
+      const breaker = new CircuitBreaker({ trip: { consecutive: 3 }, openFor: '1m' })
+      const hanging = Tenace.policy()
+        .withTimeout('5s')
+        .with(breaker)
+        .withRetry({ retries: 2, delay: '10s', retryOn: ['TimeoutError'] })
+        .settle(() => new Promise(() => {}))
+      await time.advanceBy('35s')
+      const result = await hanging
+      const opened = breaker.state
+      await time.advanceBy('1m')
+      faked = {
+        fake: time instanceof FakeClock,
+        now: clock.now().toString(),
+        timeout: !result.ok && result.error instanceof TimeoutError,
+        breaker: [opened, breaker.state],
+        pendingTimers: time.pendingTimers,
+      }
+    } finally {
+      time[Symbol.dispose]()
+    }
+
     return Response.json({
       value,
       calls,
       timeout: !timeout.ok && timeout.error instanceof TimeoutError,
       batch: batch.map(result => result.ok),
+      temporal: typeof globalThis.Temporal,
+      now: Math.abs(now.epochMilliseconds - Date.now()) < 5000,
+      polled: [polled, observations],
+      faked,
     })
   },
 }
@@ -64,6 +106,16 @@ const expected = JSON.stringify({
   calls: 3,
   timeout: true,
   batch: [true, false, true],
+  temporal: 'undefined',
+  now: true,
+  polled: ['ready', 3],
+  faked: {
+    fake: true,
+    now: '2026-01-01T00:01:35Z',
+    timeout: true,
+    breaker: ['open', 'half-open'],
+    pendingTimers: 0,
+  },
 })
 let failed = false
 

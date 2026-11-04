@@ -1,4 +1,4 @@
-import type { Clock } from './clock.ts'
+import type { Clock } from './clock/clock.ts'
 import { type Context, ExecutionContext } from './context.ts'
 import type { Duration } from './duration.ts'
 import {
@@ -61,8 +61,8 @@ export interface ExecuteOptions {
    */
   readonly signal?: AbortSignal | undefined
   /**
-   * Clock used by time-based strategies of this execution. Defaults to the system clock.
-   * Mostly useful with `TestClock` from `@julr/tenace/testing`.
+   * Clock used by time-based strategies of this execution. Defaults to the shared `clock`.
+   * Mostly useful in tests, with a `new Clock()` faked with `clock.fake()`.
    */
   readonly clock?: Clock | undefined
   /**

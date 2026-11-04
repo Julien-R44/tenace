@@ -1,4 +1,4 @@
-import { type Clock, systemClock } from '../clock.ts'
+import { type Clock, clock } from '../clock/clock.ts'
 import { type Duration, toMs } from '../duration.ts'
 
 export interface RetryBudgetOptions {
@@ -15,7 +15,7 @@ export interface RetryBudgetOptions {
    */
   readonly window?: Duration | undefined
   /**
-   * Defaults to the clock of each execution (`execute(fn, { clock })`, else the system clock).
+   * Defaults to the clock of each execution (`execute(fn, { clock })`, else the shared `clock`).
    */
   readonly clock?: Clock | undefined
 }
@@ -80,8 +80,8 @@ export class RetryBudget {
     return true
   }
 
-  #rotate(executionClock: Clock = systemClock): void {
-    const now = (this.#clock ?? executionClock).now()
+  #rotate(executionClock: Clock = clock): void {
+    const now = (this.#clock ?? executionClock).monotonic()
     this.#bucketStart ??= now
     const elapsed = now - this.#bucketStart
     if (elapsed < 0) {
