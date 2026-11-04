@@ -1,25 +1,19 @@
 /**
- * Runs the built @julr/tenace bundle inside workerd (through Miniflare), with and without
- * nodejs_compat, to check the core stays runtime agnostic.
+ * Bundles a worker importing the built @julr/tenace package, as Wrangler would, and runs it
+ * inside workerd (through Miniflare), with and without nodejs_compat, to check the core
+ * stays runtime agnostic.
  */
-import { readdir, readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
 import { Miniflare } from 'miniflare'
+import { rolldown } from 'rolldown'
 
-const buildDir = new URL('../packages/tenace/build/', import.meta.url)
-const files = await readdir(buildDir, { recursive: true })
-const buildModules = await Promise.all(
-  files
-    .filter(file => file.endsWith('.js'))
-    .map(async file => ({
-      type: 'ESModule' as const,
-      path: `tenace/${file}`,
-      contents: await readFile(new URL(file, buildDir), 'utf8'),
-    })),
-)
+const packages = {
+  '@julr/tenace': fileURLToPath(new URL('../packages/tenace/build/index.js', import.meta.url)),
+}
 
 const worker = `
-import { Result, Tenace, TimeoutError, backoff } from './tenace/index.js'
+import { Result, Tenace, TimeoutError, backoff } from '@julr/tenace'
 
 export default {
   async fetch() {
@@ -51,6 +45,20 @@ export default {
 }
 `
 
+const bundle = await rolldown({
+  input: 'worker.js',
+  platform: 'neutral',
+  plugins: [
+    {
+      name: 'smoke-worker',
+      resolveId: id => (id === 'worker.js' ? id : packages[id as keyof typeof packages]),
+      load: id => (id === 'worker.js' ? worker : undefined),
+    },
+  ],
+})
+const { output } = await bundle.generate({ format: 'esm', codeSplitting: false })
+await bundle.close()
+
 const expected = JSON.stringify({
   value: 'ok after 3',
   calls: 3,
@@ -61,7 +69,7 @@ let failed = false
 
 for (const compatibilityFlags of [[], ['nodejs_compat']]) {
   const mf = new Miniflare({
-    modules: [{ type: 'ESModule', path: 'worker.js', contents: worker }, ...buildModules],
+    modules: [{ type: 'ESModule', path: 'worker.js', contents: output[0].code }],
     compatibilityDate: '2026-08-01',
     compatibilityFlags,
   })
