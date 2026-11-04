@@ -1,4 +1,5 @@
-import type { Clock } from '../clock.ts'
+import type { Clock } from '../clock/clock.ts'
+import type { Deadline } from '../clock/types.ts'
 
 export type Release = () => void
 
@@ -58,10 +59,10 @@ export class Scheduler {
     if (this.#queued >= this.maxQueue || maxWaitMs === 0) return Promise.resolve(undefined)
 
     return new Promise(resolve => {
-      let handle: unknown
+      let deadline: Deadline | undefined
       const cleanup = (): void => {
         signal?.removeEventListener('abort', cancel)
-        if (handle !== undefined) clock?.clearTimeout(handle)
+        deadline?.[Symbol.dispose]()
       }
       const waiter: Waiter = {
         prev: undefined,
@@ -82,7 +83,8 @@ export class Scheduler {
       this.#push(waiter)
       signal?.addEventListener('abort', cancel, { once: true })
       if (maxWaitMs !== undefined && Number.isFinite(maxWaitMs) && clock) {
-        handle = clock.setTimeout(cancel, maxWaitMs)
+        deadline = clock.timeout(maxWaitMs)
+        deadline.signal.addEventListener('abort', cancel)
       }
     })
   }

@@ -52,11 +52,12 @@ export class Timeout extends Strategy<TimeoutError> {
     let onDeadline: ((result: Result.Any) => void) | undefined
     const deadline = new Promise<Result.Any>(resolve => (onDeadline = resolve))
 
-    const handle = context.clock.setTimeout(() => {
+    const timer = context.clock.timeout(this.timeoutMs)
+    timer.signal.addEventListener('abort', () => {
       timedOut = true
       link.abort(error)
       onDeadline!(Result.err(error))
-    }, this.timeoutMs)
+    })
 
     try {
       const inner = next(context.with({ signal: link.signal }))
@@ -74,7 +75,7 @@ export class Timeout extends Strategy<TimeoutError> {
       context.emit({ type: 'timeout', attempt: context.attempt, timeoutMs: this.timeoutMs })
       return Result.err(error)
     } finally {
-      context.clock.clearTimeout(handle)
+      timer[Symbol.dispose]()
       link.dispose()
     }
   }

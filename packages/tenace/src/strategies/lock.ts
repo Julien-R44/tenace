@@ -1,4 +1,4 @@
-import { type Clock, systemClock } from '../clock.ts'
+import { type Clock, clock } from '../clock/clock.ts'
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { LockNotAcquiredError, UnexpectedError } from '../errors.ts'
@@ -57,7 +57,7 @@ export class MemoryLockProvider implements LockProvider {
     const release = await scheduler.acquire({
       signal: options.signal,
       ...(options.timeoutMs !== undefined && { maxWaitMs: options.timeoutMs }),
-      clock: options.clock ?? systemClock,
+      clock: options.clock ?? clock,
     })
     if (!release) {
       this.#forgetIdle(key, scheduler)

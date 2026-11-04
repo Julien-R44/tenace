@@ -29,6 +29,7 @@
     "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2004",
     "publint": "^0.3.25",
+    "rolldown": "catalog:",
     "typescript": "catalog:",
     "typescript-5": "catalog:"
   },

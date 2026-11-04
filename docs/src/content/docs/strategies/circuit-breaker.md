@@ -35,7 +35,7 @@ new CircuitBreaker(options?: CircuitBreakerOptions)
 | `classify`      | `(result: Result.Any) => CallOutcome`         | see [Classification](#classification) | How a finished call counts.                                                                                           |
 | `onStateChange` | `({ from, to }) => void`                      |                                       | Called after each state change. An error it throws is reported, not returned.                                         |
 | `store`         | `CircuitBreakerStore`                         | `MemoryCircuitBreakerStore`           | Where the state lives. See [Stores](#stores).                                                                         |
-| `clock`         | `Clock`                                       | system clock                          | Clock for open durations and windows. Not the execution clock.                                                        |
+| `clock`         | `Clock`                                       | the shared `clock`                    | Clock for open durations and windows. Not the execution clock.                                                        |
 
 ## States
 

@@ -221,4 +221,4 @@ test.group('Forecasts', group => {
 })
 ```
 
-The policy uses the system clock, so a timeout test waits for the real timeout. To keep such tests short, read the durations from your config.
+The policy uses the system time, so a timeout test waits for the real timeout. To keep such tests short, read the durations from your config.

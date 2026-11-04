@@ -1,79 +1,82 @@
 ---
 title: Wait for a condition
-description: Poll a condition until it is true, with an interval, a timeout, and cancellation.
+description: Observe something until it is ready, with an interval, a deadline, and cancellation.
 ---
 
-`waitFor(condition, options)` calls `condition` until it returns `true`, then resolves. Use it to wait for a service to start, a job to finish, or a queue to drain.
+`clock.until(observe, options)` calls `observe` until it returns a value other than `undefined`, and returns that value. It returns `null` once `within` passes. Use it to wait for a service to start, a job to finish, or a queue to drain.
 
 ```ts
-import { waitFor } from '@julr/tenace'
+import { clock } from '@julr/tenace'
 
 declare const healthUrl: string
 
-await waitFor(
-  async ({ signal }) => {
+const healthy = await clock.until(
+  async signal => {
     const response = await fetch(healthUrl, { signal })
-    return response.ok
+    return response.ok ? true : undefined
   },
-  { interval: '500ms', timeout: '30s' },
+  { within: '30s', every: '500ms' },
 )
-```
 
-`Tenace.waitFor` is the same function.
+if (healthy === null) throw new Error('the service did not start within 30s')
+```
 
 ## Options
 
-| Option     | Type                                | Default        | Description                                                                   |
-| ---------- | ----------------------------------- | -------------- | ----------------------------------------------------------------------------- |
-| `interval` | `Duration \| (attempt) => Duration` | `100ms`        | Delay between two checks, 1ms at least. See [Intervals](#intervals).          |
-| `timeout`  | `Duration`                          | `10s`          | Longest wait, from the call. `Infinity` waits until the signal aborts.        |
-| `signal`   | `AbortSignal`                       |                | Stops waiting.                                                                |
-| `clock`    | `Clock`                             | the system one | Clock of the delays and the timeout, such as a [TestClock](/guides/testing/). |
+| Option   | Type                                | Description                                                                                        |
+| -------- | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `within` | `Duration`                          | How long to keep observing before giving up with `null`. `Infinity` waits until the signal aborts. |
+| `every`  | `Duration \| (attempt) => Duration` | The pause between two observations, 1ms at least. See [Intervals](#intervals).                     |
+| `signal` | `AbortSignal`                       | Cancels the wait.                                                                                  |
+
+The pauses and the deadline follow the clock, so a [fake clock](/guides/testing/) drives them in tests.
 
 ## How it ends
 
-The first check runs right away. Each next check starts `interval` after the previous one returned. `waitFor` then:
+The first observation runs right away. Each next one starts `every` after the previous one returned, and the last pause is cut to the deadline. `until` then:
 
-- resolves when `condition` returns `true`;
-- rejects with a [`TimeoutError`](/reference/errors/) when the timeout elapses, even during a check;
-- rejects with `signal.reason` when the signal aborts. `condition` is not called when the signal is already aborted;
-- rejects with the error of `condition` when it throws or rejects;
-- rejects with a `TypeError` when `condition` returns something other than a boolean.
+- returns the value when `observe` returns something other than `undefined`, `false` and `null` included;
+- returns `null` when `within` passes, even during an observation;
+- rejects with `signal.reason` when the signal aborts. `observe` is not called when the signal is already aborted;
+- rejects with the error of `observe` when it throws or rejects before the deadline.
 
-`condition` receives a [context](/concepts/cancellation/) with a `signal` and the 1-based `attempt` of the check. The signal aborts when the wait ends, so a check still running when the timeout fires can stop: pass the signal to `fetch` and friends.
+`observe` receives a signal that aborts at the deadline and with the caller, so an observation still running can stop: pass it to `fetch` and friends. A value observed after the deadline or the abort is dropped.
 
-An invalid `interval` or `timeout` rejects with a `RangeError`.
+An invalid `within` or `every` rejects with a `RangeError`.
 
 ## Intervals
 
-`interval` accepts a duration, or a function of the number of checks done so far. A backoff from `backoff` works, to check often at first and less often later:
+`every` accepts a duration, or a function of the number of observations done so far. A backoff from `backoff` works, to observe often at first and less often later:
 
 ```ts
-import { backoff, waitFor } from '@julr/tenace'
+import { backoff, clock } from '@julr/tenace'
 
-declare function isJobDone(jobId: string): Promise<boolean>
+declare function findJob(jobId: string): Promise<{ done: boolean; output: string }>
 
-await waitFor(() => isJobDone('job-1'), {
-  interval: backoff.exponential({ base: '100ms', max: '5s', jitter: 'none' }),
-  timeout: '2m',
-})
+const output = await clock.until(
+  async () => {
+    const job = await findJob('job-1')
+    return job.done ? job.output : undefined
+  },
+  { within: '2m', every: backoff.exponential({ base: '100ms', max: '5s', jitter: 'none' }) },
+)
 ```
 
 ## Treat errors as not ready
 
-A throwing `condition` ends the wait. When an error means "not ready yet", such as a database that refuses connections while it starts, catch it and return `false`:
+A throwing `observe` ends the wait. When an error means "not ready yet", such as a database that refuses connections while it starts, catch it and return `undefined`:
 
 ```ts
-import { waitFor } from '@julr/tenace'
+import { clock } from '@julr/tenace'
 
 declare const db: { ping(): Promise<void> }
 
-await waitFor(
+await clock.until(
   () =>
     db.ping().then(
       () => true,
-      () => false,
+      () => undefined,
     ),
-  { interval: '500ms', timeout: '1m' },
+  { within: '1m', every: '500ms' },
 )
 ```

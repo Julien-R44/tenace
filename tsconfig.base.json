@@ -3,7 +3,7 @@
   "extends": "@julr/tooling-configs/tsconfigs/tsconfig.base",
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["ES2024"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
