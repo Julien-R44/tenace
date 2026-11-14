@@ -140,6 +140,8 @@ The timeout bounds `poll()` itself, not the later body read. Detached tasks and 
 
 ## Migrate the previous waitFor helper
 
+For all Clock API changes, including `TestClock`, timestamps, and callback timers, follow the [v2 to v3 migration guide](/guides/migrate-clock/).
+
 Before:
 
 ```ts nocheck

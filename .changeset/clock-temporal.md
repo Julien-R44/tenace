@@ -4,6 +4,8 @@
 
 One `Clock` for every policy, with Temporal dates, deadlines, and a fake time for tests. It replaces the `Clock` interface, `systemClock`, `TestClock`, and `waitFor`.
 
+Follow the [v2 to v3 migration guide](https://tenace.julr.dev/guides/migrate-clock/) for before-and-after examples of every removed API and the changes to error handling.
+
 - `clock.now()` returns a `Temporal.Instant`, the calendar time. `clock.monotonic()` returns milliseconds on a clock that never jumps, for durations.
 - `clock.wait(duration, signal?)` resolves once the duration passes, and `clock.timeout(duration)` returns a deadline, `{ signal } & Disposable`.
 - `clock.waitFor(condition, options?)` waits for a boolean or `Result<boolean, E>` and returns `Result<void, E | TimeoutError | CancelledError | UnexpectedError>`.

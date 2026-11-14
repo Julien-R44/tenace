@@ -5,6 +5,8 @@ description: Drive time with a fake clock, inject faults with chaos, and assert 
 
 Policies wait for timeouts, retry delays, and open circuits. A test that waits for real time is slow and flaky. Every policy reads the time from a clock, and `clock.fake()` replaces it with a time that moves only when you tell it to.
 
+If your tests use `TestClock`, follow the [v2 to v3 migration guide](/guides/migrate-clock/#replace-testclock-in-tests).
+
 ## Control time with clock.fake()
 
 Fake the shared `clock` exported by `@julr/tenace`. Every policy reads it, so the timeouts, the retry delays, and the circuit breakers follow the same fake time:

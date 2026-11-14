@@ -115,7 +115,13 @@ export default defineConfig({
         },
         {
           label: 'Reference',
-          items: ['reference/api', 'reference/errors', 'reference/events', 'reference/runtimes'],
+          items: [
+            'reference/api',
+            'reference/errors',
+            'reference/events',
+            'reference/runtimes',
+            'guides/migrate-clock',
+          ],
         },
       ],
     }),
