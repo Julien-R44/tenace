@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [[`524b66d`](https://github.com/Julien-R44/tenace/commit/524b66deae2fc99ceb32c5e60e7da4cacd111f57)]:
+  - @julr/tenace@3.0.0
+
 ## 2.0.0
 
 ### Major Changes
