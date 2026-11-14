@@ -155,7 +155,12 @@ export class Clock {
    * await time.advanceBy('2 hours')
    */
   fake(at?: Temporal.Instant | Date): FakeClock {
-    const fake = new FakeClock(at ?? this.now(), () => this.restore())
+    if (this.#source instanceof FakeClock) {
+      throw new Error('Clock is already faked; restore it before creating another fake')
+    }
+    const fake = new FakeClock(at ?? this.now(), () => {
+      if (this.#source === fake) this.restore()
+    })
     this.#source = fake
     return fake
   }
@@ -165,7 +170,9 @@ export class Clock {
    * never resolve.
    */
   restore(): void {
+    const source = this.#source
     this.#source = this.#system
+    if (source instanceof FakeClock) source[Symbol.dispose]()
   }
 }
 

@@ -38,6 +38,29 @@ const result = await done // a TimeoutError, after three attempts
 
 `advanceBy()` lets pending promise callbacks run between timers, so a timer scheduled after another one fires within the same call. It also lets a retry without delay go on after it yields to the event loop, every 100 retries. Always `await` it. It takes a number of milliseconds or a string such as `'30s'`, and rejects with a `RangeError` for a negative, `NaN`, or infinite duration. A timer of `Infinity` never fires, not even with `runAll()`.
 
+Use either manual advancement or `letTimePass()` for one fake. After enabling automatic time, `advanceBy()` and `runAll()` reject. Overlapping manual advancements also reject; await one before starting another. Automatic time advances while a wait is pending, not for a lone deadline or real I/O.
+
+Only one fake may be active on a Clock. A second `fake()` call throws until the first is restored. Restoration stops its driver and discards its timers without resolving pending waits or aborting deadlines. Finish or cancel work before restoring; restoration does not join running tasks. Disposing an old fake again cannot affect a newer one.
+
+### Wait until the code schedules a timer
+
+Arm `nextWait()` before starting the operation. Otherwise, a synchronous wait may already have consumed the notification:
+
+```ts
+import { Clock } from '@julr/tenace'
+
+const clock = new Clock()
+using time = clock.fake(new Date(0))
+const waiting = time.nextWait()
+const work = clock.wait('5m')
+
+await waiting
+await time.advanceBy('5m')
+await work
+```
+
+For TypeScript, include `ESNext.Disposable` in `compilerOptions.lib` when your selected library set does not already provide `Disposable`. `using` disposes at the end of the enclosing scope. Without `using`, call `clock.restore()` in `finally`.
+
 ### Give a test its own clock
 
 Faking the shared clock fakes it for the whole process. To keep a test apart, for example when tests run concurrently, create a `Clock` and pass it to the execution:

@@ -39,9 +39,10 @@ async function flush(): Promise<void> {
  *
  * @example
  * using time = clock.fake()
+ * const waiting = time.nextWait()
  * const job = worker.start() // waits for 5 minutes between two runs
  *
- * await time.nextWait()
+ * await waiting
  * await time.advanceBy('5 minutes') // the worker runs once more
  */
 export class FakeClock implements TimeSource, Disposable {
@@ -49,7 +50,7 @@ export class FakeClock implements TimeSource, Disposable {
   #calendarOrigin: bigint
   #timers: Timer[] = []
   #nextWait = Promise.withResolvers<void>()
-  #passing = false
+  #mode: 'idle' | 'manual' | 'automatic' | 'disposed' = 'idle'
   #driving = false
   #pendingWaits = new Set<Promise<void>>()
   #restore: () => void
@@ -63,6 +64,10 @@ export class FakeClock implements TimeSource, Disposable {
    * Restores the system time of the clock that created this fake
    */
   [Symbol.dispose](): void {
+    if (this.#mode === 'disposed') return
+    this.#mode = 'disposed'
+    this.#timers = []
+    this.#pendingWaits.clear()
     this.#restore()
   }
 
@@ -103,7 +108,8 @@ export class FakeClock implements TimeSource, Disposable {
    * Moves both times forward by a finite `duration`, and fires the timers
    * due on the way in order. Promise continuations of what a timer ended
    * run before the next one fires. Rejects with a `RangeError` for a
-   * negative, `NaN` or infinite duration.
+   * negative, `NaN` or infinite duration. Await each advancement before
+   * starting another one. Manual and automatic driving cannot be mixed.
    */
   async advanceBy(duration: Duration): Promise<void> {
     const milliseconds = toMs(duration)
@@ -111,15 +117,17 @@ export class FakeClock implements TimeSource, Disposable {
       throw new RangeError('Invalid duration: Infinity. advanceBy() expects a finite duration')
     }
 
-    const end = this.#monotonic + milliseconds
-    await flush()
-
-    while (this.#timers[0] && this.#timers[0].at <= end) {
-      this.#fireNext()
+    await this.#drive(async () => {
+      const end = this.#monotonic + milliseconds
       await flush()
-    }
 
-    this.#monotonic = end
+      while (this.#mode !== 'disposed' && this.#timers[0] && this.#timers[0].at <= end) {
+        this.#fireNext()
+        await flush()
+      }
+
+      if (this.#mode !== 'disposed') this.#monotonic = end
+    })
   }
 
   /**
@@ -128,23 +136,28 @@ export class FakeClock implements TimeSource, Disposable {
    * to surface an endless loop of timers.
    */
   async runAll(limit = 10_000): Promise<void> {
-    await flush()
-
-    for (let fired = 0; this.#hasDueTimer(); fired++) {
-      if (fired >= limit) throw new Error(`runAll() fired more than ${limit} timers`)
-      this.#fireNext()
+    await this.#drive(async () => {
       await flush()
-    }
+
+      for (let fired = 0; this.#mode !== 'disposed' && this.#hasDueTimer(); fired++) {
+        if (fired >= limit) throw new Error(`runAll() fired more than ${limit} timers`)
+        this.#fireNext()
+        await flush()
+      }
+    })
   }
 
   /**
    * From now on, each wait moves the time to its end at once, firing
    * the timers due on the way, deadlines included. Waits already pending
    * end too. Use it when the code under test does real I/O between two
-   * waits, where `advanceBy` cannot tell when the I/O is done.
+   * waits, where `advanceBy` cannot tell when the I/O is done. Once
+   * enabled, `advanceBy` and `runAll` reject instead of competing with it.
    */
   letTimePass(): this {
-    this.#passing = true
+    if (this.#mode === 'manual') throw new Error('FakeClock is already being advanced')
+    if (this.#mode === 'disposed') throw new Error('FakeClock has been disposed')
+    this.#mode = 'automatic'
     void this.#pass()
     return this
   }
@@ -182,7 +195,7 @@ export class FakeClock implements TimeSource, Disposable {
     this.#nextWait.resolve()
     this.#nextWait = Promise.withResolvers<void>()
 
-    if (this.#passing) {
+    if (this.#mode === 'automatic') {
       void this.#pass()
     }
 
@@ -196,6 +209,19 @@ export class FakeClock implements TimeSource, Disposable {
     })
 
     return { signal: controller.signal, [Symbol.dispose]: dispose }
+  }
+
+  async #drive(run: () => Promise<void>): Promise<void> {
+    if (this.#mode === 'automatic') throw new Error('FakeClock is in automatic mode')
+    if (this.#mode === 'manual') throw new Error('FakeClock is already being advanced')
+    if (this.#mode === 'disposed') throw new Error('FakeClock has been disposed')
+
+    this.#mode = 'manual'
+    try {
+      await run()
+    } finally {
+      if (this.#mode === 'manual') this.#mode = 'idle'
+    }
   }
 
   /**
@@ -212,7 +238,7 @@ export class FakeClock implements TimeSource, Disposable {
     try {
       await flush()
 
-      while (this.#pendingWaits.size > 0 && this.#hasDueTimer()) {
+      while (this.#mode === 'automatic' && this.#pendingWaits.size > 0 && this.#hasDueTimer()) {
         this.#fireNext()
         await flush()
       }

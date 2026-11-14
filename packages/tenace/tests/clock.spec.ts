@@ -37,6 +37,74 @@ test.group('Clock', () => {
     assert.closeTo(clock.now().epochMilliseconds, Date.now(), 50)
   })
 
+  test('disposing an old fake does not replace the current fake', async ({ assert }) => {
+    const clock = new Clock()
+    const first = clock.fake(START)
+    clock.restore()
+
+    using second = clock.fake(new Date('2030-06-01T00:00:00Z'))
+    first[Symbol.dispose]()
+
+    assert.equal(clock.now().toString(), '2030-06-01T00:00:00Z')
+    await second.advanceBy(7)
+    assert.equal(clock.monotonic(), 7)
+  })
+
+  test('restoring stops the automatic driver and abandons pending timers', async ({ assert }) => {
+    const clock = new Clock()
+    const time = clock.fake(START).letTimePass()
+    let woke = false
+    const deadline = clock.timeout(5)
+    void clock.wait(10).then(() => (woke = true))
+
+    clock.restore()
+    await setImmediate()
+    await setImmediate()
+
+    assert.isFalse(woke)
+    assert.isFalse(deadline.signal.aborted)
+    assert.equal(time.monotonic(), 0)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('refuses manual advancement in automatic mode', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
+    const readings: number[] = []
+    const wait = clock.wait(100).then(() => readings.push(clock.monotonic()))
+
+    await assert.rejects(() => time.advanceBy(10), /automatic/)
+    await assert.rejects(() => time.runAll(), /automatic/)
+    await wait
+
+    assert.deepEqual(readings, [100])
+    assert.equal(clock.monotonic(), 100)
+  })
+
+  test('refuses nested fakes and overlapping drivers without changing the active clock', async ({
+    assert,
+  }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+    assert.throws(() => clock.fake(new Date(0)), /already faked/)
+    assert.equal(clock.now().toString(), '2026-01-01T10:00:00Z')
+
+    const advancing = time.advanceBy(100)
+    const overlapping = time.advanceBy(10)
+    const draining = time.runAll()
+    assert.throws(() => time.letTimePass(), /already being advanced/)
+    await assert.rejects(() => overlapping, /already being advanced/)
+    await assert.rejects(() => draining, /already being advanced/)
+    await advancing
+    assert.equal(clock.monotonic(), 100)
+
+    const stopped = time.advanceBy(50)
+    clock.restore()
+    await stopped
+    assert.equal(time.monotonic(), 100)
+    await assert.rejects(() => time.advanceBy(1), /disposed/)
+  })
+
   test('waits for real time with a duration expression', async ({ assert }) => {
     const clock = new Clock()
     const start = performance.now()
@@ -403,7 +471,7 @@ test.group('FakeClock | Tenace timers', () => {
     assert.equal(time.pendingTimers, 1)
 
     time.letTimePass()
-    await time.advanceBy(10)
+    await setImmediate()
     assert.deepEqual(fired, ['nan@0'])
   })
 
