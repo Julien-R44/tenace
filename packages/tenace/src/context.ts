@@ -24,6 +24,11 @@ export interface ExecutionContextInit {
   readonly key?: string | undefined
   readonly idempotent?: boolean | undefined
   /**
+   * `false` when the timers of the strategies must not keep the process alive.
+   * Defaults to `true`.
+   */
+  readonly ref?: boolean | undefined
+  /**
    * `false` when nothing can abort `signal`. Defaults to `true`.
    */
   readonly abortable?: boolean | undefined
@@ -52,6 +57,11 @@ export class ExecutionContext implements Context {
    */
   readonly idempotent: boolean
   /**
+   * `false` when the timers of this execution do not keep the process alive
+   * (`execute(fn, { ref: false })`). Pass it to `clock.wait()` and `clock.timeout()`.
+   */
+  readonly ref: boolean
+  /**
    * The signal nothing can abort, if any. Private, so a context spread into a new one with
    * another signal does not carry it.
    */
@@ -64,6 +74,7 @@ export class ExecutionContext implements Context {
     this.scope = init.scope ?? noopScope
     this.key = init.key
     this.idempotent = init.idempotent ?? true
+    this.ref = init.ref ?? true
     this.#idleSignal = init.abortable === false ? init.signal : undefined
     Object.freeze(this)
   }
@@ -99,6 +110,7 @@ export class ExecutionContext implements Context {
       scope: patch.scope ?? this.scope,
       key: 'key' in patch ? patch.key : this.key,
       idempotent: patch.idempotent ?? this.idempotent,
+      ref: patch.ref ?? this.ref,
       // another signal comes from something that can abort it (a timeout, a batch)
       abortable: patch.abortable ?? signal !== this.#idleSignal,
     })

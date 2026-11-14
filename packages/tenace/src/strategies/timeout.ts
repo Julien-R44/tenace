@@ -52,7 +52,7 @@ export class Timeout extends Strategy<TimeoutError> {
     let onDeadline: ((result: Result.Any) => void) | undefined
     const deadline = new Promise<Result.Any>(resolve => (onDeadline = resolve))
 
-    const timer = context.clock.timeout(this.timeoutMs)
+    const timer = context.clock.timeout(this.timeoutMs, { ref: context.ref })
     timer.signal.addEventListener('abort', () => {
       timedOut = true
       link.abort(error)

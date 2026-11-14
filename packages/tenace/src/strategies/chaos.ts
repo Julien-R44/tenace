@@ -68,7 +68,7 @@ export class Chaos<E = never, V = never> extends Strategy<E, never, V> {
 
     if (latency !== undefined) {
       const ms = toMs(typeof latency === 'function' ? latency() : latency)
-      if (!(await sleep(context.clock, ms, context.signal))) {
+      if (!(await sleep(context.clock, ms, context.signal, context.ref))) {
         return Result.err(new UnexpectedError(context.signal.reason))
       }
     }

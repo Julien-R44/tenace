@@ -10,9 +10,30 @@ import type { Duration } from '../duration.ts'
 export type Deadline = { signal: AbortSignal } & Disposable
 
 /**
- * Options accepted by `clock.waitFor` and `clock.poll`.
+ * Options of the timers a clock starts.
  */
-export type WaitForOptions = {
+export type TimerOptions = {
+  /**
+   * `false` lets the process exit while only this timer is pending, like `timer.unref()` of
+   * Node.js: code awaiting the timer then never resumes. Defaults to `true`. No effect outside
+   * Node.js and Bun, nor on a fake clock.
+   */
+  ref?: boolean | undefined
+}
+
+/**
+ * Options accepted by `clock.wait`.
+ */
+export type WaitOptions = TimerOptions & {
+  /** Rejects the wait with an `AbortError` when it aborts */
+  signal?: AbortSignal | undefined
+}
+
+/**
+ * Options accepted by `clock.waitFor` and `clock.poll`. `ref` applies to both the deadline
+ * and the pauses between observations.
+ */
+export type WaitForOptions = TimerOptions & {
   /** Total time budget, including observations. Defaults to 10 seconds. `Infinity` disables it */
   timeout?: Duration | undefined
   /**
@@ -42,6 +63,6 @@ export type PollOptions<T> = WaitForOptions & {
 export interface TimeSource {
   now(): Temporal.Instant
   monotonic(): number
-  wait(milliseconds: number, signal?: AbortSignal): Promise<void>
-  timeout(milliseconds: number): Deadline
+  wait(milliseconds: number, options?: WaitOptions): Promise<void>
+  timeout(milliseconds: number, options?: TimerOptions): Deadline
 }

@@ -43,7 +43,7 @@ const users = await Tenace.map(ids, (userId, { signal }) => fetchUser(userId, { 
 
 An invalid `concurrency` throws a `RangeError` when the batch is created.
 
-`execute()` and `settle()` accept a `signal` and a `clock`, which reach every task.
+`execute()` and `settle()` accept a `signal`, a `clock`, and a [`ref`](/reference/api/#let-the-process-exit) flag, which reach every task.
 
 ## Stop at the first failure
 

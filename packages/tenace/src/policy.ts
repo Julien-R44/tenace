@@ -82,6 +82,14 @@ export interface ExecuteOptions {
    */
   readonly idempotent?: boolean | undefined
   /**
+   * Set to `false` so the timers of this execution (timeouts, retry delays, chaos latency,
+   * rate limit, bulkhead and lock waits) do not keep the process alive on their own, like
+   * `timer.unref()` of Node.js. When only its timers are left pending, the process exits and
+   * code awaiting the execution never resumes. Defaults to `true`. No effect outside Node.js
+   * and Bun, nor on a fake clock.
+   */
+  readonly ref?: boolean | undefined
+  /**
    * Extra attributes reported to instrumentation (low cardinality).
    */
   readonly attributes?: Attributes | undefined
@@ -549,6 +557,7 @@ export class Policy<
       ...(options?.clock && { clock: options.clock }),
       key: options?.key,
       idempotent: options?.idempotent ?? true,
+      ref: options?.ref ?? true,
       // nobody holds the controller of the signal created here
       abortable: signal !== undefined,
     })

@@ -164,7 +164,7 @@ export class RateLimit extends Strategy<RateLimitError> {
         context.emit({ type: 'rate_limit.rejected', key, retryAfterMs })
         return Result.err(new RateLimitError(key, retryAfterMs))
       }
-      if (!(await sleep(clock, retryAfterMs, context.signal))) {
+      if (!(await sleep(clock, retryAfterMs, context.signal, context.ref))) {
         return Result.err(new UnexpectedError(context.signal.reason))
       }
     }

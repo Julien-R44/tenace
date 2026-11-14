@@ -45,7 +45,7 @@ export function verrou(factory: VerrouLike, options: VerrouAdapterOptions = {}):
 
   return {
     async acquire(key: string, options: LockAcquireOptions): Promise<LockLease | undefined> {
-      const { signal, timeoutMs, clock = sharedClock } = options
+      const { signal, timeoutMs, clock = sharedClock, ref } = options
       const lock = factory.createLock(key, options.ttlMs)
       const deadline = clock.monotonic() + (timeoutMs ?? Number.POSITIVE_INFINITY)
 
@@ -53,7 +53,7 @@ export function verrou(factory: VerrouLike, options: VerrouAdapterOptions = {}):
         if (await lock.acquireImmediately()) return { release: () => lock.release() }
         const remainingMs = deadline - clock.monotonic()
         if (remainingMs <= 0) return undefined
-        await sleep(clock, Math.min(retryDelayMs, remainingMs), signal)
+        await sleep(clock, Math.min(retryDelayMs, remainingMs), signal, ref)
       }
       return undefined
     },

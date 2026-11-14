@@ -66,9 +66,9 @@ const policy = Tenace.policy()
 ## Follow the rules
 
 - **Return failures, do not throw them.** `execute()` must resolve to a `Result`. A throw is a bug, and the execution rejects with the thrown value, from `settle()` too.
-- **Derive the context, do not mutate it.** `ExecutionContext` is frozen. `context.with({ ... })` returns a new context with a different `signal`, `attempt`, `key`, `clock`, or `idempotent` flag, for the inner steps.
+- **Derive the context, do not mutate it.** `ExecutionContext` is frozen. `context.with({ ... })` returns a new context with a different `signal`, `attempt`, `key`, `clock`, `idempotent` flag, or `ref` flag, for the inner steps.
 - **Respect the signal.** Stop waiting when `context.signal` aborts, and check `context.signal.aborted` before you start new work. When `context.abortable` is `false`, nothing can abort it and you can skip the listener. A context derived with a new `signal` is abortable.
-- **Use the execution clock.** Wait with `context.clock.wait()` or `context.clock.timeout()`, and measure durations with `context.clock.monotonic()`, so the strategy follows a [fake clock](/guides/testing/).
+- **Use the execution clock.** Wait with `context.clock.wait()` or `context.clock.timeout()`, and measure durations with `context.clock.monotonic()`, so the strategy follows a [fake clock](/guides/testing/). Pass `{ ref: context.ref }` to them, so `execute(fn, { ref: false })` covers the timers of the strategy too.
 - **Report events.** `context.emit({ type: 'custom', name, attributes })` sends an event to the instrumentation of the execution. `context.observed` is `false` when nothing listens, so you can skip building an expensive event.
 
 ## Share state on purpose
@@ -84,6 +84,7 @@ A strategy instance is shared by every policy you add it to. The `Quota` above c
 | `clock`       | The clock of the execution.                                    |
 | `key`         | The key of the execution, or `undefined`.                      |
 | `idempotent`  | `false` when the execution runs with `idempotent: false`.      |
+| `ref`         | `false` when the execution runs with `ref: false`.             |
 | `abortable`   | `false` when nothing can abort `signal`: skip listening to it. |
 | `scope`       | The instrumentation hooks of the execution.                    |
 | `observed`    | Whether an instrumentation observes the execution.             |

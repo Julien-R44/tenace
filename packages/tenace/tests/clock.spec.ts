@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import { execFile } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
@@ -126,6 +127,40 @@ test.group('Clock', () => {
     assert.isTrue(deadline.signal.aborted)
     assert.equal(deadline.signal.reason.name, 'TimeoutError')
   })
+
+  test('ref: false lets the process exit while only its timers are pending', async ({ assert }) => {
+    const index = new URL('../src/index.ts', import.meta.url).href
+    // one pending timer of each kind, an hour away: a wait, a deadline, the deadline and
+    // the pause of waitFor, and a policy whose timeout and retry delay are both pending
+    const script = (ref: string): string => `
+      import { clock, Tenace } from '${index}'
+      const options = ${ref}
+      void clock.wait('1h', options)
+      clock.timeout('1h', options)
+      void clock.waitFor(() => false, { timeout: '1h', interval: '30min', ...options })
+      void Tenace.policy()
+        .withTimeout('1h')
+        .withRetry({ retries: 1, delay: '1h' })
+        .settle(({ attempt }) => attempt > 1 ? new Promise(() => {}) : Promise.reject(1), options)
+    `
+    // the second stays up until killed
+    const exits = await Promise.all(
+      ['{ ref: false }', '{}'].map(
+        ref =>
+          new Promise<string>(resolve => {
+            execFile(
+              process.execPath,
+              [...process.execArgv, '--input-type=module', '-e', script(ref)],
+              { timeout: 1500 },
+              (error, _stdout, stderr) =>
+                resolve(error ? (error.killed ? 'killed' : `failed: ${stderr}`) : 'exited'),
+            )
+          }),
+      ),
+    )
+
+    assert.deepEqual(exits, ['exited', 'killed'])
+  }).timeout(5000)
 })
 
 test.group('Clock | fake', () => {
@@ -200,7 +235,7 @@ test.group('Clock | fake', () => {
     clock.fake(START)
     const controller = new AbortController()
 
-    const wait = clock.wait(1000, controller.signal)
+    const wait = clock.wait(1000, { signal: controller.signal })
     controller.abort('stopped')
 
     const error = await wait.catch(reason => reason)
@@ -294,7 +329,7 @@ test.group('Clock | waitFor and poll', () => {
       async ({ signal, attempt }) => {
         assert.equal(active++, 0)
         observedAt.push(clock.monotonic())
-        await clock.wait(3, signal)
+        await clock.wait(3, { signal })
         return Result.ok({ id: 'job-7', done: attempt === 3 })
       },
       {

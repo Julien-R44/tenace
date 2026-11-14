@@ -22,7 +22,7 @@ The types need TypeScript 5.9 or later, the oldest version the CI typechecks aga
 The package has no static `node:` import. These features depend on the runtime:
 
 - **`diagnostics_channel`.** Tenace loads it with `process.getBuiltinModule()` the first time an execution runs. Where it is missing, such as Workers without `nodejs_compat`, nothing is published and nothing fails. See [diagnostics_channel](/observability/diagnostics-channel/).
-- **Timers.** The system clock uses the global `setTimeout` and `clearTimeout`, which every supported runtime provides. It chains them for delays beyond their limit of 2^31 - 1 ms.
+- **Timers.** The system clock uses the global `setTimeout` and `clearTimeout`, which every supported runtime provides. It chains them for delays beyond their limit of 2^31 - 1 ms. With [`ref: false`](/reference/api/#let-the-process-exit), it calls `unref()` on them in Node.js and Bun; elsewhere the option has no effect.
 - **Temporal.** `clock.now()` returns a `Temporal.Instant`. Tenace uses the native API whenever available, including Node.js 26, Bun, and recent Workers with the `temporal` compatibility flag. Node.js 24, Node.js 22, and Workers without Temporal use a dynamic import of `temporal-polyfill`. The fallback does not modify `globalThis`. Node.js 24 applications, including AdonisJS, need no runtime flag or application-level polyfill setup.
 
 `pnpm test:workerd` checks the fallback with the repository's workerd version. `pnpm test:workerd:native` checks native Temporal on workerd 2026-11-04 with the `temporal` flag. The native smoke test also rejects any bundle that invokes the fallback loader.

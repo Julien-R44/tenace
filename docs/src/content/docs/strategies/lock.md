@@ -55,6 +55,7 @@ interface LockAcquireOptions {
   readonly timeoutMs: number | undefined // undefined: wait as long as the signal allows
   readonly ttlMs: number | undefined // undefined: the provider default
   readonly clock?: Clock
+  readonly ref?: boolean // false: the waits must not keep the process alive
 }
 
 interface LockLease {

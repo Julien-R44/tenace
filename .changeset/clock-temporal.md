@@ -7,7 +7,8 @@ One `Clock` for every policy, with Temporal dates, deadlines, and a fake time fo
 Follow the [v2 to v3 migration guide](https://tenace.julr.dev/guides/migrate-clock/) for before-and-after examples of every removed API and the changes to error handling.
 
 - `clock.now()` returns a `Temporal.Instant`, the calendar time. `clock.monotonic()` returns milliseconds on a clock that never jumps, for durations.
-- `clock.wait(duration, signal?)` resolves once the duration passes, and `clock.timeout(duration)` returns a deadline, `{ signal } & Disposable`.
+- `clock.wait(duration, { signal? })` resolves once the duration passes, and `clock.timeout(duration)` returns a deadline, `{ signal } & Disposable`.
+- `ref: false` lets the process exit while only Tenace timers are pending, like `timer.unref()`. Pass it to `clock.wait()`, `clock.timeout()`, `clock.waitFor()`, `clock.poll()`, `execute()`, `settle()`, and batches, which apply it to every timer of their strategies. Timers keep the process alive by default.
 - `clock.waitFor(condition, options?)` waits for a boolean or `Result<boolean, E>` and returns `Result<void, E | TimeoutError | CancelledError | UnexpectedError>`.
 - `clock.poll(observe, { until, ...options })` returns the unwrapped observation accepted by the predicate. No value is a sentinel. Both methods retain `timeout`, `interval`, `signal`, the defaults of 10 seconds and 100ms, and the `{ signal, attempt }` callback context. Business errors are preserved. Exceptions, invalid arguments, timeouts, and cancellation become error Results.
 - `clock.fake(at?)` replaces the time of a clock with a `FakeClock`: `advanceBy`, `runAll`, `setTime`, `letTimePass`, `nextWait`, `pendingTimers`, and `pendingDeadlines`. Dispose it with `using`, or call `clock.restore()`.

@@ -8,7 +8,14 @@ import { raceAbort } from '../internal/race_signal.ts'
 import { Result } from '../result/namespace.ts'
 import { FakeClock } from './fake_clock.ts'
 import { SystemClock } from './system_clock.ts'
-import type { Deadline, PollOptions, TimeSource, WaitForOptions } from './types.ts'
+import type {
+  Deadline,
+  PollOptions,
+  TimerOptions,
+  TimeSource,
+  WaitForOptions,
+  WaitOptions,
+} from './types.ts'
 
 /**
  * Reads the time and waits for it to pass. Code that depends on time
@@ -51,21 +58,25 @@ export class Clock {
    * Resolves once the duration passes. Rejects with an `AbortError`
    * when the signal aborts first. A wait of `Infinity` only ends with
    * the signal.
+   *
+   * @example
+   * await clock.wait('1s', { signal })
    */
-  wait(duration: Duration, signal?: AbortSignal): Promise<void> {
-    return this.#source.wait(toMs(duration), signal)
+  wait(duration: Duration, options?: WaitOptions): Promise<void> {
+    return this.#source.wait(toMs(duration), options)
   }
 
   /**
    * Starts a deadline whose signal aborts with a `TimeoutError` once
-   * the duration passes. Dispose it when the work it bounds ends.
+   * the duration passes. Dispose it when the work it bounds ends. With
+   * `ref: false`, the pending deadline does not keep the process alive.
    *
    * @example
    * using deadline = clock.timeout('5s')
    * await client.query(sql, { signal: deadline.signal })
    */
-  timeout(duration: Duration): Deadline {
-    return this.#source.timeout(toMs(duration))
+  timeout(duration: Duration, options?: TimerOptions): Deadline {
+    return this.#source.timeout(toMs(duration), options)
   }
 
   /**
@@ -74,6 +85,7 @@ export class Clock {
    * Timeouts, cancellation and thrown values also return error Results.
    * Defaults to a 10-second timeout and a 100ms interval.
    * The condition's signal aborts when this operation ends, success included.
+   * `ref: false` applies to its deadline and its pauses alike.
    *
    * @example
    * const ready = await clock.waitFor(
@@ -132,6 +144,7 @@ export class Clock {
    * All outcomes are Results. The timeout covers observations that ignore
    * their signal too. A successful value keeps a live signal, still linked
    * to the caller, so resources such as Response bodies remain usable.
+   * `ref: false` applies to its deadline and its pauses alike.
    *
    * @example
    * const job = await clock.poll(
@@ -170,7 +183,7 @@ export class Clock {
       if (typeof interval !== 'function') toMs(interval)
       end = this.monotonic() + timeout
       timeoutError = new TimeoutError(timeout)
-      deadline = this.timeout(timeout)
+      deadline = this.timeout(timeout, { ref: options.ref })
       const signal = AbortSignal.any([
         controller.signal,
         deadline.signal,
@@ -210,7 +223,7 @@ export class Clock {
           toMs(typeof interval === 'function' ? interval(attempt) : interval),
           1,
         )
-        await this.wait(Math.min(pause, left), signal)
+        await this.wait(Math.min(pause, left), { signal, ref: options.ref })
         caller?.throwIfAborted()
         if (expired()) throw timeoutError
       }

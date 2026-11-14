@@ -70,14 +70,15 @@ See [execute() and settle()](/concepts/execute-and-settle/).
 
 ### ExecuteOptions
 
-| Option       | Type          | Default         | Description                                                                                                           |
-| ------------ | ------------- | --------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `signal`     | `AbortSignal` |                 | Aborting it stops the execution. The promise rejects with `signal.reason`, without running `fn` when already aborted. |
-| `clock`      | `Clock`       | `clock`         | Clock of the time-based strategies of this execution. See [Testing](/guides/testing/).                                |
-| `name`       | `string`      | the policy name | Operation name reported to instrumentation.                                                                           |
-| `key`        | `string`      |                 | Key of the execution. See [Keys](/concepts/keys/).                                                                    |
-| `idempotent` | `boolean`     | `true`          | `false` when running the function twice is not safe. See [Idempotency](/strategies/retry/#idempotency).               |
-| `attributes` | `Attributes`  | `{}`            | Extra attributes reported to instrumentation. Keep them low cardinality.                                              |
+| Option       | Type          | Default         | Description                                                                                                               |
+| ------------ | ------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `signal`     | `AbortSignal` |                 | Aborting it stops the execution. The promise rejects with `signal.reason`, without running `fn` when already aborted.     |
+| `clock`      | `Clock`       | `clock`         | Clock of the time-based strategies of this execution. See [Testing](/guides/testing/).                                    |
+| `name`       | `string`      | the policy name | Operation name reported to instrumentation.                                                                               |
+| `key`        | `string`      |                 | Key of the execution. See [Keys](/concepts/keys/).                                                                        |
+| `idempotent` | `boolean`     | `true`          | `false` when running the function twice is not safe. See [Idempotency](/strategies/retry/#idempotency).                   |
+| `ref`        | `boolean`     | `true`          | `false` so the timers of this execution do not keep the process alive. See [Let the process exit](#let-the-process-exit). |
+| `attributes` | `Attributes`  | `{}`            | Extra attributes reported to instrumentation. Keep them low cardinality.                                                  |
 
 ### Context
 
@@ -134,20 +135,55 @@ Strings also accept `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'`. `toMs(duration)` co
 
 Every policy reads the time from a `Clock`: the shared `clock` exported by `@julr/tenace`, or the one passed to `execute(fn, { clock })`.
 
-| Member                         | Returns                                                                         | Description                                                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `now()`                        | `Temporal.Instant`                                                              | The calendar time, for dates stored or shown to users. Circuit breakers and rate limit stores read it.        |
-| `monotonic()`                  | `number`                                                                        | Milliseconds on a clock that only moves forward, for durations. Compare two readings only.                    |
-| `wait(duration, signal?)`      | `Promise<void>`                                                                 | Resolves once the duration passes. Rejects with an `AbortError` when the signal aborts.                       |
-| `timeout(duration)`            | `{ signal } & Disposable`                                                       | A deadline whose signal aborts with a `TimeoutError` once the duration passes. Dispose it when the work ends. |
-| `waitFor(condition, options?)` | `Promise<Result<void, E \| TimeoutError \| CancelledError \| UnexpectedError>>` | Waits for a boolean or a Result containing one. Preserves returned business errors `E`.                       |
-| `poll(observe, options)`       | `Promise<Result<T, E \| TimeoutError \| CancelledError \| UnexpectedError>>`    | Returns the unwrapped observation accepted by `until`. Preserves returned business errors `E`.                |
-| `fake(at?)`                    | `FakeClock`                                                                     | Replaces the system time with a fake one. See [Testing](/guides/testing/).                                    |
-| `restore()`                    | `void`                                                                          | Goes back to the system time.                                                                                 |
+| Member                         | Returns                                                                         | Description                                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `now()`                        | `Temporal.Instant`                                                              | The calendar time, for dates stored or shown to users. Circuit breakers and rate limit stores read it.                         |
+| `monotonic()`                  | `number`                                                                        | Milliseconds on a clock that only moves forward, for durations. Compare two readings only.                                     |
+| `wait(duration, options?)`     | `Promise<void>`                                                                 | Resolves once the duration passes. Takes `{ signal, ref }`. Rejects with an `AbortError` when the signal aborts.               |
+| `timeout(duration, options?)`  | `{ signal } & Disposable`                                                       | A deadline whose signal aborts with a `TimeoutError` once the duration passes. Dispose it when the work ends. Takes `{ ref }`. |
+| `waitFor(condition, options?)` | `Promise<Result<void, E \| TimeoutError \| CancelledError \| UnexpectedError>>` | Waits for a boolean or a Result containing one. Preserves returned business errors `E`.                                        |
+| `poll(observe, options)`       | `Promise<Result<T, E \| TimeoutError \| CancelledError \| UnexpectedError>>`    | Returns the unwrapped observation accepted by `until`. Preserves returned business errors `E`.                                 |
+| `fake(at?)`                    | `FakeClock`                                                                     | Replaces the system time with a fake one. See [Testing](/guides/testing/).                                                     |
+| `restore()`                    | `void`                                                                          | Goes back to the system time.                                                                                                  |
 
 `Temporal` is the native API where the runtime has one, such as Node.js 26 and Bun, and the [`temporal-polyfill`](https://github.com/fullcalendar/temporal-polyfill) ponyfill elsewhere. The ponyfill is not installed on `globalThis`.
 
 The system time uses the global timers, and chains them for delays longer than about 24.8 days. A wait or a deadline of `Infinity` never ends.
+
+### Let the process exit
+
+By default, a pending wait or deadline keeps a Node.js or Bun process alive until it ends, as `setTimeout` does. Pass `ref: false` so it does not, like `timer.unref()` or the `ref` option of `node:timers/promises`. The process then exits once nothing else keeps it alive, and the pending timer never fires.
+
+Use it for background work that must not delay the exit, such as a periodic refresh:
+
+```ts
+import { clock, type Fn, type ReusablePolicy, Tenace } from '@julr/tenace'
+
+declare const refreshConfig: Fn
+declare const isReady: () => Promise<boolean>
+declare const policy: ReusablePolicy
+declare const tasks: Fn[]
+declare const signal: AbortSignal
+
+async function refreshLoop(): Promise<void> {
+  while (!signal.aborted) {
+    await policy.settle(refreshConfig, { signal, ref: false })
+    await clock.wait('5 minutes', { signal, ref: false })
+  }
+}
+void refreshLoop()
+
+void clock.waitFor(isReady, { timeout: '1 minute', ref: false })
+void Tenace.all(tasks, { policy }).settle({ ref: false })
+```
+
+Code that awaits a `ref: false` operation never resumes when the process exits during it. A top-level `await` on one makes Node.js exit with code 13 and an `unsettled top-level await` warning. Keep `ref: false` for work the process may abandon.
+
+Set it where the operation starts, not on each timer. `waitFor()` and `poll()` apply it to their deadline and to the pauses between observations. `execute()`, `settle()`, and batches apply it to every timer of their strategies: timeouts, retry delays, chaos latency, and waits for a bulkhead, a rate limit, or a lock. A custom strategy reads it from `context.ref` and passes it on, and so does a custom lock provider from `LockAcquireOptions`. A strategy or a provider that does not pass it on keeps the process alive.
+
+With [`dedupe`](/strategies/dedupe/), or a cache that coalesces calls, the shared run uses the `ref` of the caller that started it.
+
+It has no effect on a fake clock, nor outside Node.js and Bun, such as in browsers and Workers.
 
 ### WaitForOptions and PollOptions
 
@@ -158,6 +194,7 @@ The system time uses the global timers, and chains them for delays longer than a
 | `timeout`  | `Duration`                                      | `'10s'`               | Total budget, including observations. `Infinity` disables it. Zero permits one immediate check.                                                           |
 | `interval` | `Duration \| (attempt: number) => Duration`     | `100`                 | Pause after a completed observation, at least 1ms. The final pause is cut to the deadline.                                                                |
 | `signal`   | `AbortSignal`                                   | none                  | External cancellation returns `CancelledError` with the original reason as its cause.                                                                     |
+| `ref`      | `boolean`                                       | `true`                | `false` so the deadline and the pauses do not keep the process alive. See [Let the process exit](#let-the-process-exit).                                  |
 | `until`    | `(value: T) => boolean \| PromiseLike<boolean>` | required for `poll()` | Accepts the unwrapped observation. The timeout also bounds the predicate. All values, including `undefined`, `null`, `false`, and `0`, are ordinary data. |
 
 The shared options are exported as `WaitForOptions`; `PollOptions<T>` adds `until`. The chosen clock is the instance on which the method is called, not an option.

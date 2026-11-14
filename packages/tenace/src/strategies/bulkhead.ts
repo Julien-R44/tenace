@@ -75,6 +75,7 @@ export class Bulkhead extends Strategy<BulkheadFullError> {
     const release = await this.#scheduler.acquire({
       ...(context.abortable && { signal: context.signal }),
       clock: context.clock,
+      ref: context.ref,
       ...(this.#maxWaitMs !== undefined && { maxWaitMs: this.#maxWaitMs }),
     })
     if (!release) {

@@ -28,6 +28,11 @@ export interface LockAcquireOptions {
    * Clock of the execution, for providers that wait in process.
    */
   readonly clock?: Clock | undefined
+  /**
+   * `false` when the timers of the wait must not keep the process alive
+   * (`execute(fn, { ref: false })`). `undefined` means `true`.
+   */
+  readonly ref?: boolean | undefined
 }
 
 /**
@@ -58,6 +63,7 @@ export class MemoryLockProvider implements LockProvider {
       signal: options.signal,
       ...(options.timeoutMs !== undefined && { maxWaitMs: options.timeoutMs }),
       clock: options.clock ?? clock,
+      ref: options.ref,
     })
     if (!release) {
       this.#forgetIdle(key, scheduler)
@@ -145,6 +151,7 @@ export class Lock extends Strategy<LockNotAcquiredError> {
         timeoutMs: this.#timeoutMs,
         ttlMs: this.#ttlMs,
         clock: context.clock,
+        ref: context.ref,
       })
     } catch (error) {
       return Result.err(new UnexpectedError(error))

@@ -38,7 +38,7 @@ A `Dedupe` instance exposes `pending`, the number of keys running now.
 
 The shared run gets its own signal. A caller that aborts stops waiting, and the run continues for the others. The run aborts when every caller has aborted.
 
-Every caller receives the same `Result`. The shared run uses the context of the first caller: its attempt number, its clock, and its instrumentation.
+Every caller receives the same `Result`. The shared run uses the context of the first caller: its attempt number, its clock, its instrumentation, and its [`ref`](/reference/api/#let-the-process-exit) flag. A caller that joins a run started with `ref: false` may never settle if the process exits during it.
 
 ## Error channel
 

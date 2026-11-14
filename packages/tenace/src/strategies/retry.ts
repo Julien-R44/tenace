@@ -197,7 +197,7 @@ export class Retry<E = unknown, V = unknown> extends Strategy {
 
       if (delayMs > 0) {
         immediateRetries = 0
-        const waited = await sleep(context.clock, delayMs, context.signal)
+        const waited = await sleep(context.clock, delayMs, context.signal, context.ref)
         if (!waited) return result
       } else {
         if (++immediateRetries % IMMEDIATE_RETRIES_PER_YIELD === 0) await yieldToEventLoop()

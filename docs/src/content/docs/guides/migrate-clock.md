@@ -221,7 +221,7 @@ import { clock } from '@julr/tenace'
 await clock.wait('500ms')
 ```
 
-To cancel a wait, pass an `AbortSignal` as the second argument. Unlike polling, `clock.wait()` rejects with an `AbortError` when cancelled; it does not return a Result.
+To cancel a wait, pass `{ signal }` as the second argument. Unlike polling, `clock.wait()` rejects with an `AbortError` when cancelled; it does not return a Result.
 
 For a cancellable operation with a deadline, replace the abort controller and timer cleanup with `clock.timeout()`.
 

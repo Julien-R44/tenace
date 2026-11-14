@@ -4,7 +4,7 @@ import { type Duration, toMs } from '../duration.ts'
 import { macrotask, pendingYields } from '../internal/sleep.ts'
 import { abortError } from './system_clock.ts'
 import { temporal } from './temporal.ts'
-import type { Deadline, TimeSource } from './types.ts'
+import type { Deadline, TimeSource, WaitOptions } from './types.ts'
 
 type Timer = { at: number; fire: () => void; deadline: boolean }
 
@@ -170,7 +170,8 @@ export class FakeClock implements TimeSource, Disposable {
     return this.#nextWait.promise
   }
 
-  wait(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  wait(milliseconds: number, options?: WaitOptions): Promise<void> {
+    const signal = options?.signal
     const wait = new Promise<void>((resolve, reject) => {
       const abort = (): void => {
         dispose()

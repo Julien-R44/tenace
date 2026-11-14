@@ -40,12 +40,18 @@ export function yieldToEventLoop(): Promise<void> {
 /**
  * Waits `ms` milliseconds on the given clock. Never rejects: resolves `true` when the
  * delay elapsed, `false` as soon as the signal aborts (or immediately if already aborted).
- * `Infinity` only ends with the signal, `NaN` is treated as `0`.
+ * `Infinity` only ends with the signal, `NaN` is treated as `0`. `ref: false` lets the
+ * process exit while only this wait is pending.
  */
-export function sleep(clock: Clock, ms: number, signal?: AbortSignal): Promise<boolean> {
+export function sleep(
+  clock: Clock,
+  ms: number,
+  signal?: AbortSignal,
+  ref?: boolean,
+): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false)
   if (!(ms > 0)) return Promise.resolve(true)
-  return clock.wait(ms, signal).then(
+  return clock.wait(ms, { signal, ref }).then(
     () => true,
     () => false,
   )

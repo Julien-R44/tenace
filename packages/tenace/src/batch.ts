@@ -21,9 +21,17 @@ export interface BatchRunOptions {
    */
   readonly signal?: AbortSignal | undefined
   readonly clock?: Clock | undefined
+  /**
+   * `false` so the timers of every task do not keep the process alive, as
+   * `execute(fn, { ref: false })`. Defaults to `true`.
+   */
+  readonly ref?: boolean | undefined
 }
 
-type Runner = (task: Fn, options: { signal: AbortSignal; clock?: Clock }) => Promise<unknown>
+type Runner = (
+  task: Fn,
+  options: { signal: AbortSignal; clock?: Clock; ref?: boolean },
+) => Promise<unknown>
 
 /**
  * A set of tasks run through the same policy, with bounded concurrency.
@@ -74,7 +82,11 @@ export class Batch<Values extends readonly unknown[], Results extends readonly u
     options.signal?.throwIfAborted()
     const tasks = this.#tasks
     const link = linkSignal(options.signal)
-    const runOptions = { signal: link.signal, ...(options.clock && { clock: options.clock }) }
+    const runOptions = {
+      signal: link.signal,
+      ...(options.clock && { clock: options.clock }),
+      ...(options.ref !== undefined && { ref: options.ref }),
+    }
     const outputs: unknown[] = Array.from({ length: tasks.length })
     let failed = false
 

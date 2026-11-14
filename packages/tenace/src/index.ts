@@ -7,7 +7,14 @@ export {
   type LinearBackoffOptions,
 } from './backoff.ts'
 export { Clock, clock } from './clock/clock.ts'
-export type { Deadline, PollOptions, TimeSource, WaitForOptions } from './clock/types.ts'
+export type {
+  Deadline,
+  PollOptions,
+  TimerOptions,
+  TimeSource,
+  WaitForOptions,
+  WaitOptions,
+} from './clock/types.ts'
 export { type Context, ExecutionContext, type ExecutionContextInit } from './context.ts'
 export { type Duration, type DurationUnit, toMs } from './duration.ts'
 export {

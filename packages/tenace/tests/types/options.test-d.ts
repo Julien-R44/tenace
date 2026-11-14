@@ -2,7 +2,12 @@ import type { VerrouAdapterOptions } from '../../src/adapters/verrou.ts'
 import type { BatchOptions, BatchRunOptions } from '../../src/batch.ts'
 import type { ExponentialBackoffOptions, LinearBackoffOptions } from '../../src/backoff.ts'
 import { clock } from '../../src/clock/clock.ts'
-import type { PollOptions, WaitForOptions } from '../../src/clock/types.ts'
+import type {
+  PollOptions,
+  TimerOptions,
+  WaitForOptions,
+  WaitOptions,
+} from '../../src/clock/types.ts'
 import type { ExecutionContextInit } from '../../src/context.ts'
 import type { TenaceEvent } from '../../src/instrumentation.ts'
 import type { ExecuteOptions, PolicyOptions } from '../../src/policy.ts'
@@ -43,6 +48,8 @@ expectType<Equal<RejectsUndefined<PolicyOptions>, never>>()
 expectType<Equal<RejectsUndefined<BatchOptions<unknown>>, never>>()
 expectType<Equal<RejectsUndefined<BatchRunOptions>, never>>()
 expectType<Equal<RejectsUndefined<WaitForOptions>, never>>()
+expectType<Equal<RejectsUndefined<WaitOptions>, never>>()
+expectType<Equal<RejectsUndefined<TimerOptions>, never>>()
 expectType<Equal<RejectsUndefined<PollOptions<number>>, never>>()
 expectType<Equal<RejectsUndefined<ExponentialBackoffOptions>, never>>()
 expectType<Equal<RejectsUndefined<LinearBackoffOptions>, never>>()
@@ -66,7 +73,7 @@ expectType<Equal<RejectsUndefined<ChaosOptions<Error, string>>, never>>()
 expectType<Equal<RejectsUndefined<VerrouAdapterOptions>, never>>()
 
 /* ---- forwarding options of a wrapper ---- */
-declare const opts: { signal?: AbortSignal; name?: string; delay?: number }
+declare const opts: { signal?: AbortSignal; name?: string; delay?: number; ref?: boolean }
 const policy = Tenace.policy({ name: opts.name })
 await policy.execute(() => 1, { signal: opts.signal, name: opts.name })
 await Tenace.call(() => 1, { name: opts.name }).settle({ signal: opts.signal })
@@ -77,3 +84,8 @@ await Tenace.all([() => 1], { policy: undefined, concurrency: undefined }).execu
 })
 await clock.waitFor(() => true, { timeout: 1, interval: 1, signal: opts.signal })
 await clock.poll(() => 1, { until: value => value > 0, signal: opts.signal })
+await clock.wait(1, { signal: opts.signal, ref: opts.ref })
+clock.timeout(1, { ref: opts.ref })[Symbol.dispose]()
+await clock.waitFor(() => true, { ref: opts.ref })
+await policy.execute(() => 1, { ref: opts.ref })
+await Tenace.all([() => 1]).settle({ ref: opts.ref })

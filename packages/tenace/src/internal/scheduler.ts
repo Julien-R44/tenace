@@ -49,9 +49,14 @@ export class Scheduler {
    * Takes a slot, waiting in line when every slot is busy.
    */
   acquire(
-    options: { signal?: AbortSignal; maxWaitMs?: number; clock?: Clock } = {},
+    options: {
+      signal?: AbortSignal
+      maxWaitMs?: number
+      clock?: Clock
+      ref?: boolean | undefined
+    } = {},
   ): Promise<Release | undefined> {
-    const { signal, maxWaitMs, clock } = options
+    const { signal, maxWaitMs, clock, ref } = options
     if (signal?.aborted) return Promise.resolve(undefined)
 
     const immediate = this.tryAcquire()
@@ -83,7 +88,7 @@ export class Scheduler {
       this.#push(waiter)
       signal?.addEventListener('abort', cancel, { once: true })
       if (maxWaitMs !== undefined && Number.isFinite(maxWaitMs) && clock) {
-        deadline = clock.timeout(maxWaitMs)
+        deadline = clock.timeout(maxWaitMs, { ref })
         deadline.signal.addEventListener('abort', cancel)
       }
     })
