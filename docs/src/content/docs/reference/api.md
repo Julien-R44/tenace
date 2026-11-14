@@ -134,16 +134,32 @@ Strings also accept `'+1s'`, `'5.s'`, `'1e3ms'`, and `'0s'`. `toMs(duration)` co
 
 Every policy reads the time from a `Clock`: the shared `clock` exported by `@julr/tenace`, or the one passed to `execute(fn, { clock })`.
 
-| Member                    | Returns                   | Description                                                                                                   |
-| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `now()`                   | `Temporal.Instant`        | The calendar time, for dates stored or shown to users. Circuit breakers and rate limit stores read it.        |
-| `monotonic()`             | `number`                  | Milliseconds on a clock that only moves forward, for durations. Compare two readings only.                    |
-| `wait(duration, signal?)` | `Promise<void>`           | Resolves once the duration passes. Rejects with an `AbortError` when the signal aborts.                       |
-| `timeout(duration)`       | `{ signal } & Disposable` | A deadline whose signal aborts with a `TimeoutError` once the duration passes. Dispose it when the work ends. |
-| `until(observe, options)` | `Promise<T \| null>`      | Observes until a value comes. See [Wait for a condition](/guides/wait-for/).                                  |
-| `fake(at?)`               | `FakeClock`               | Replaces the system time with a fake one. See [Testing](/guides/testing/).                                    |
-| `restore()`               | `void`                    | Goes back to the system time.                                                                                 |
+| Member                         | Returns                                                                         | Description                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `now()`                        | `Temporal.Instant`                                                              | The calendar time, for dates stored or shown to users. Circuit breakers and rate limit stores read it.        |
+| `monotonic()`                  | `number`                                                                        | Milliseconds on a clock that only moves forward, for durations. Compare two readings only.                    |
+| `wait(duration, signal?)`      | `Promise<void>`                                                                 | Resolves once the duration passes. Rejects with an `AbortError` when the signal aborts.                       |
+| `timeout(duration)`            | `{ signal } & Disposable`                                                       | A deadline whose signal aborts with a `TimeoutError` once the duration passes. Dispose it when the work ends. |
+| `waitFor(condition, options?)` | `Promise<Result<void, E \| TimeoutError \| CancelledError \| UnexpectedError>>` | Waits for a boolean or a Result containing one. Preserves returned business errors `E`.                       |
+| `poll(observe, options)`       | `Promise<Result<T, E \| TimeoutError \| CancelledError \| UnexpectedError>>`    | Returns the unwrapped observation accepted by `until`. Preserves returned business errors `E`.                |
+| `fake(at?)`                    | `FakeClock`                                                                     | Replaces the system time with a fake one. See [Testing](/guides/testing/).                                    |
+| `restore()`                    | `void`                                                                          | Goes back to the system time.                                                                                 |
 
 `Temporal` is the native API where the runtime has one, such as Node.js 26 and Bun, and the [`temporal-polyfill`](https://github.com/fullcalendar/temporal-polyfill) ponyfill elsewhere. The ponyfill is not installed on `globalThis`.
 
 The system time uses the global timers, and chains them for delays longer than about 24.8 days. A wait or a deadline of `Infinity` never ends.
+
+### WaitForOptions and PollOptions
+
+`waitFor()` and `poll()` pass `{ signal, attempt }` to the callback. The attempt number starts at 1. `poll()` unwraps a returned Result before calling its predicate.
+
+| Option     | Type                                            | Default               | Description                                                                                                                                               |
+| ---------- | ----------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `timeout`  | `Duration`                                      | `'10s'`               | Total budget, including observations. `Infinity` disables it. Zero permits one immediate check.                                                           |
+| `interval` | `Duration \| (attempt: number) => Duration`     | `100`                 | Pause after a completed observation, at least 1ms. The final pause is cut to the deadline.                                                                |
+| `signal`   | `AbortSignal`                                   | none                  | External cancellation returns `CancelledError` with the original reason as its cause.                                                                     |
+| `until`    | `(value: T) => boolean \| PromiseLike<boolean>` | required for `poll()` | Accepts the unwrapped observation. The timeout also bounds the predicate. All values, including `undefined`, `null`, `false`, and `0`, are ordinary data. |
+
+The shared options are exported as `WaitForOptions`; `PollOptions<T>` adds `until`. The chosen clock is the instance on which the method is called, not an option.
+
+Both methods return error Results for validation errors, thrown values, and rejected promises. An already aborted signal skips the observation. A returned business error ends the operation without wrapping it. Timers are disposed at every exit. `waitFor()` aborts its signal on success; `poll()` preserves it so a returned resource remains usable and linked to the caller. The Result guarantee does not cover detached tasks or later use of a returned resource. See [Wait for a condition](/guides/wait-for/) for examples and migration.

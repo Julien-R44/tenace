@@ -1,13 +1,15 @@
 /**
  * Bundles a worker importing the built @julr/tenace package, as Wrangler would, and runs it
  * inside workerd (through Miniflare), with and without nodejs_compat, to check the core
- * stays runtime agnostic. workerd has no native Temporal, so the clock runs on the
- * temporal-polyfill ponyfill.
+ * stays runtime agnostic. The default checks the Temporal fallback on the pinned runtime.
+ * --native-temporal checks a newer workerd with Temporal enabled and forbids the fallback.
  */
 import { fileURLToPath } from 'node:url'
 
 import { Miniflare } from 'miniflare'
 import { rolldown } from 'rolldown'
+
+const nativeTemporal = process.argv.includes('--native-temporal')
 
 const packages = {
   '@julr/tenace': fileURLToPath(new URL('../packages/tenace/build/index.js', import.meta.url)),
@@ -17,7 +19,7 @@ const packages = {
 }
 
 const worker = `
-import { CircuitBreaker, Result, Tenace, TimeoutError, backoff, clock } from '@julr/tenace'
+import { CancelledError, CircuitBreaker, Result, Tenace, TimeoutError, backoff, clock } from '@julr/tenace'
 import { FakeClock } from '@julr/tenace/testing'
 
 export default {
@@ -41,11 +43,17 @@ export default {
     const batch = await Tenace.map([1, 2, 3], n => (n === 2 ? Result.err('two') : n), { concurrency: 2 }).settle()
 
     // the system clock
+    const initialTemporal = globalThis.Temporal
     const now = clock.now()
     let observations = 0
-    const polled = await clock.until(() => (++observations === 3 ? 'ready' : undefined), {
-      within: '1s',
-      every: 5,
+    const polled = await clock.poll(() => ({ ready: ++observations === 3, id: 'job-7' }), {
+      until: job => job.ready,
+      timeout: '1s',
+      interval: 5,
+    })
+    const healthy = await clock.waitFor(() => Result.ok(true))
+    const cancelled = await clock.waitFor(() => { throw new Error('must not run') }, {
+      signal: AbortSignal.abort('stopped'),
     })
 
     // one fake drives the timeouts, the retry delays and the circuit breaker
@@ -79,8 +87,12 @@ export default {
       timeout: !timeout.ok && timeout.error instanceof TimeoutError,
       batch: batch.map(result => result.ok),
       temporal: typeof globalThis.Temporal,
+      nativeInstant: initialTemporal ? now instanceof initialTemporal.Instant : false,
+      globalsUnchanged: initialTemporal === globalThis.Temporal,
       now: Math.abs(now.epochMilliseconds - Date.now()) < 5000,
-      polled: [polled, observations],
+      polled: [polled.ok ? polled.value : polled.error._tag, observations],
+      healthy: healthy.ok,
+      cancelled: !cancelled.ok && cancelled.error instanceof CancelledError && cancelled.error.cause === 'stopped',
       faked,
     })
   },
@@ -93,8 +105,16 @@ const bundle = await rolldown({
   plugins: [
     {
       name: 'smoke-worker',
-      resolveId: id => (id === 'worker.js' ? id : packages[id as keyof typeof packages]),
-      load: id => (id === 'worker.js' ? worker : undefined),
+      resolveId: id => {
+        if (nativeTemporal && id === 'temporal-polyfill') return '\0forbidden-polyfill'
+        return id === 'worker.js' ? id : packages[id as keyof typeof packages]
+      },
+      load: id => {
+        if (id === '\0forbidden-polyfill') {
+          return `export const Temporal = undefined; throw new Error('Native Temporal smoke test loaded the polyfill')`
+        }
+        return id === 'worker.js' ? worker : undefined
+      },
     },
   ],
 })
@@ -106,9 +126,13 @@ const expected = JSON.stringify({
   calls: 3,
   timeout: true,
   batch: [true, false, true],
-  temporal: 'undefined',
+  temporal: nativeTemporal ? 'object' : 'undefined',
+  nativeInstant: nativeTemporal,
+  globalsUnchanged: true,
   now: true,
-  polled: ['ready', 3],
+  polled: [{ ready: true, id: 'job-7' }, 3],
+  healthy: true,
+  cancelled: true,
   faked: {
     fake: true,
     now: '2026-01-01T00:01:35Z',
@@ -119,16 +143,20 @@ const expected = JSON.stringify({
 })
 let failed = false
 
-for (const compatibilityFlags of [[], ['nodejs_compat']]) {
+for (const nodeCompat of [false, true]) {
+  const compatibilityFlags = [
+    ...(nodeCompat ? ['nodejs_compat'] : nativeTemporal ? ['no_nodejs_compat'] : []),
+    ...(nativeTemporal ? ['temporal'] : []),
+  ]
   const mf = new Miniflare({
     modules: [{ type: 'ESModule', path: 'worker.js', contents: output[0].code }],
-    compatibilityDate: '2026-08-01',
+    compatibilityDate: nativeTemporal ? '2026-11-04' : '2026-08-01',
     compatibilityFlags,
   })
   try {
     const response = await mf.dispatchFetch('http://localhost/')
     const body = JSON.stringify(await response.json())
-    const label = compatibilityFlags.length ? 'workerd + nodejs_compat' : 'workerd'
+    const label = `workerd${nodeCompat ? ' + nodejs_compat' : ''} (${nativeTemporal ? 'native Temporal' : 'Temporal fallback'})`
     if (body === expected) {
       console.log(`${label}: ok`)
     } else {

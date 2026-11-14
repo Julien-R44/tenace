@@ -1,5 +1,6 @@
 import { test } from '@japa/runner'
 
+import { Clock } from '../src/clock/clock.ts'
 import { UnexpectedError } from '../src/errors.ts'
 import { Result } from '../src/result/index.ts'
 import { registerResult, unregisterResult } from '../src/result/registry.ts'
@@ -28,6 +29,17 @@ test.group('Result registry', group => {
       await Tenace.policy().settle(async () => new AppErr(notFound)),
       Result.err(notFound),
     )
+
+    const clock = new Clock()
+    using time = clock.fake(new Date(0)).letTimePass()
+    let checks = 0
+    const ready = await clock.waitFor(async () => new AppOk(++checks === 2))
+    assert.isTrue(ready.ok)
+    assert.equal(checks, 2)
+    const job = await clock.poll(() => new AppOk({ ready: true }), { until: job => job.ready })
+    assert.deepEqual(Result.unwrap(job), { ready: true })
+    assert.strictEqual(Result.unwrapErr(await clock.waitFor(() => new AppErr(notFound))), notFound)
+    assert.equal(time.pendingTimers, 0)
   })
 
   test('foreign results are plain values when nothing is registered', async ({ assert }) => {

@@ -1,9 +1,12 @@
 import { test } from '@japa/runner'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 import { clock as sharedClock, Clock } from '../src/clock/clock.ts'
 import { SystemClock } from '../src/clock/system_clock.ts'
-import { TimeoutError } from '../src/errors.ts'
+import { CancelledError, TimeoutError, UnexpectedError } from '../src/errors.ts'
 import { sleep } from '../src/internal/sleep.ts'
+import { Result } from '../src/result/namespace.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
 import { backoff } from '../src/backoff.ts'
@@ -256,137 +259,260 @@ test.group('Clock | fake', () => {
   })
 })
 
-test.group('Clock | until', () => {
-  test('returns the first observed value, observing every interval', async ({ assert }) => {
+test.group('Clock | waitFor and poll', () => {
+  test('waitFor unwraps booleans and uses the default interval', async ({ assert }) => {
     const clock = new Clock()
-    clock.fake(START).letTimePass()
+    using time = clock.fake(START).letTimePass()
     const observedAt: number[] = []
+    const attempts: number[] = []
+    let lastSignal: AbortSignal | undefined
 
-    const value = await clock.until(
-      async () => {
-        observedAt.push(clock.monotonic())
-        return observedAt.length === 3 ? 'ready' : undefined
-      },
-      { within: '1 minute', every: '10s' },
-    )
+    const result = await clock.waitFor(async ({ signal, attempt }) => {
+      lastSignal = signal
+      attempts.push(attempt)
+      observedAt.push(clock.monotonic())
+      return Result.ok(attempt === 3)
+    })
 
-    assert.equal(value, 'ready')
-    assert.deepEqual(observedAt, [0, 10_000, 20_000])
+    assert.isTrue(result.ok)
+    assert.isUndefined(Result.unwrap(result))
+    assert.deepEqual(observedAt, [0, 100, 200])
+    assert.deepEqual(attempts, [1, 2, 3])
+    assert.isTrue(lastSignal!.aborted)
+    assert.equal(time.pendingTimers, 0)
   })
 
-  test('returns null once within passes, with a last wait cut to the deadline', async ({
+  test('poll returns the unwrapped accepted observation without overlapping calls', async ({
     assert,
   }) => {
     const clock = new Clock()
-    const time = clock.fake(START).letTimePass()
+    using time = clock.fake(START).letTimePass()
     const observedAt: number[] = []
+    let active = 0
 
-    const value = await clock.until(
-      async () => {
+    const result = await clock.poll(
+      async ({ signal, attempt }) => {
+        assert.equal(active++, 0)
         observedAt.push(clock.monotonic())
-        return undefined
+        await clock.wait(3, signal)
+        return Result.ok({ id: 'job-7', done: attempt === 3 })
       },
-      { within: 25_000, every: 10_000 },
+      {
+        until: async job => {
+          await clock.wait(2)
+          active--
+          return job.done
+        },
+        timeout: 100,
+        interval: 10,
+      },
     )
 
-    assert.isNull(value)
-    assert.deepEqual(observedAt, [0, 10_000, 20_000])
-    assert.equal(clock.monotonic(), 25_000)
-    assert.equal(time.pendingDeadlines, 0)
+    assert.deepEqual(Result.unwrap(result), { id: 'job-7', done: true })
+    assert.deepEqual(observedAt, [0, 15, 30])
+    assert.equal(clock.monotonic(), 35)
+    assert.equal(time.pendingTimers, 0)
   })
 
-  test('returns null when the deadline cuts an observation short', async ({ assert }) => {
+  test('poll treats falsy and nullable values as data, not sentinels', async ({ assert }) => {
     const clock = new Clock()
-    const time = clock.fake(START)
+    using time = clock.fake(START).letTimePass()
 
-    const result = clock.until(
-      signal =>
+    for (const value of [0, false, null, undefined]) {
+      const result = await clock.poll(({ attempt }) => (attempt === 2 ? value : 'pending'), {
+        until: observed => observed === value,
+        interval: 7,
+      })
+      assert.isTrue(result.ok)
+      assert.strictEqual(Result.unwrap(result), value)
+    }
+    assert.equal(clock.monotonic(), 28)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('both methods preserve a business error and stop without retrying', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+    const failed = Result.err({ _tag: 'DeploymentGone', id: 'deploy-7' })
+    let observations = 0
+    const signals: AbortSignal[] = []
+    const observe = ({ signal }: { signal: AbortSignal }) => {
+      observations++
+      signals.push(signal)
+      return failed
+    }
+
+    assert.strictEqual(await clock.waitFor(observe), failed)
+    assert.strictEqual(await clock.poll(observe, { until: () => true }), failed)
+    assert.equal(observations, 2)
+    assert.isTrue(signals.every(signal => signal.aborted))
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('returns TimeoutError with a last wait cut to the deadline', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
+    const observedAt: number[] = []
+
+    const result = await clock.waitFor(
+      async () => {
+        observedAt.push(clock.monotonic())
+        return false
+      },
+      { timeout: 25_000, interval: 10_000 },
+    )
+
+    assert.equal(Result.unwrapErr(result, 'TimeoutError').timeoutMs, 25_000)
+    assert.deepEqual(observedAt, [0, 10_000, 20_000])
+    assert.equal(clock.monotonic(), 25_000)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('uses the default timeout of 10 seconds', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
+    const result = await clock.poll(() => 0, { until: value => value === 1 })
+
+    assert.equal(Result.unwrapErr(result, 'TimeoutError').timeoutMs, 10_000)
+    assert.equal(clock.monotonic(), 10_000)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('drops values resolved by the abort at the deadline', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+
+    const result = clock.poll(
+      ({ signal }) =>
         new Promise<string>(resolve => {
           signal.addEventListener('abort', () => resolve('too late'))
         }),
-      { within: '5s', every: '1s' },
+      { until: () => true, timeout: '5s', interval: '1s' },
     )
     await time.advanceBy('5s')
 
-    assert.isNull(await result)
+    assert.equal(Result.unwrapErr(await result, 'TimeoutError').timeoutMs, 5000)
+    assert.equal(time.pendingTimers, 0)
   })
 
-  test('throws the reason of a caller that aborts', async ({ assert }) => {
+  test('cancellation while waiting returns CancelledError and its original cause', async ({
+    assert,
+  }) => {
     const clock = new Clock()
-    const time = clock.fake(START)
+    using time = clock.fake(START)
     const controller = new AbortController()
+    const cause = new Error('cancelled by caller')
 
-    const result = clock.until(async () => undefined, {
-      within: '1 minute',
-      every: '1s',
+    const result = clock.waitFor(async () => false, {
+      timeout: '1 minute',
+      interval: '1s',
       signal: controller.signal,
     })
     await time.advanceBy('2s')
-    controller.abort(new Error('cancelled by caller'))
+    controller.abort(cause)
 
-    await assert.rejects(() => result, 'cancelled by caller')
-    assert.equal(time.pendingDeadlines, 0)
+    const error = Result.unwrapErr(await result, 'CancelledError')
+    assert.instanceOf(error, CancelledError)
+    assert.strictEqual(error.cause, cause)
+    assert.equal(time.pendingTimers, 0)
   })
-})
 
-test.group('Clock | until in Tenace', () => {
-  test('every accepts a backoff of the number of observations', async ({ assert }) => {
+  test('an already aborted signal skips both observations', async ({ assert }) => {
     const clock = new Clock()
-    clock.fake(START).letTimePass()
+    using time = clock.fake(START)
+    const signal = AbortSignal.abort('stopped')
+    let called = false
+    const observe = () => (called = true)
+
+    const results = [
+      await clock.waitFor(observe, { signal }),
+      await clock.poll(observe, { signal, until: () => true }),
+    ]
+    for (const result of results) {
+      assert.equal(Result.unwrapErr(result, 'CancelledError').cause, 'stopped')
+    }
+    assert.isFalse(called)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('interval accepts a backoff of the number of observations', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
     const observedAt: number[] = []
 
-    const value = await clock.until(
+    const result = await clock.waitFor(
       () => {
         observedAt.push(clock.monotonic())
-        return observedAt.length === 4 ? 'ready' : undefined
+        return observedAt.length === 4
       },
-      { within: '1 minute', every: backoff.exponential({ base: '1s', jitter: 'none' }) },
+      { timeout: '1 minute', interval: backoff.exponential({ base: '1s', jitter: 'none' }) },
     )
 
-    assert.equal(value, 'ready')
+    assert.isTrue(result.ok)
     assert.deepEqual(observedAt, [0, 1000, 3000, 7000])
+    assert.equal(time.pendingTimers, 0)
   })
 
-  test('returns null at the deadline when the observation ignores its signal', async ({
+  test('bounds observations and predicates that ignore cancellation and consumes late rejections', async ({
     assert,
   }) => {
     const clock = new Clock()
-    const time = clock.fake(START)
+    using time = clock.fake(START)
+    const late = Promise.withResolvers<boolean>()
+    let signal: AbortSignal | undefined
 
-    const result = clock.until(() => new Promise<string>(() => {}), { within: '5s', every: '1s' })
+    const result = clock.waitFor(
+      context => {
+        signal = context.signal
+        return late.promise
+      },
+      { timeout: '5s' },
+    )
     await time.advanceBy('5s')
 
-    assert.isNull(await result)
-    assert.equal(time.pendingDeadlines, 0)
+    assert.equal(Result.unwrapErr(await result, 'TimeoutError').timeoutMs, 5000)
+    assert.isTrue(signal!.aborted)
+    assert.equal(time.pendingTimers, 0)
+    late.reject(new Error('arrived after timeout'))
+    await setImmediate()
+
+    const predicate = Promise.withResolvers<boolean>()
+    const polled = clock.poll(() => 7, { until: () => predicate.promise, timeout: 25 })
+    await time.advanceBy(25)
+
+    assert.equal(Result.unwrapErr(await polled, 'TimeoutError').timeoutMs, 25)
+    assert.equal(time.pendingTimers, 0)
+    predicate.reject(new Error('predicate failed after timeout'))
+    await setImmediate()
   })
 
-  test('throws the reason of a caller that aborts during an observation that ignores it', async ({
+  test('cancels an observation that ignores its signal, even with an infinite timeout', async ({
     assert,
   }) => {
     const clock = new Clock()
-    const time = clock.fake(START)
+    using time = clock.fake(START)
     const controller = new AbortController()
 
-    const result = clock.until(() => new Promise<string>(() => {}), {
-      within: '1 minute',
-      every: '1s',
+    const result = clock.poll(() => new Promise<string>(() => {}), {
+      until: () => true,
+      timeout: Infinity,
       signal: controller.signal,
     })
-    controller.abort(new Error('cancelled by caller'))
+    controller.abort('cancelled by caller')
 
-    await assert.rejects(() => result, 'cancelled by caller')
-    assert.equal(time.pendingDeadlines, 0)
+    assert.equal(Result.unwrapErr(await result, 'CancelledError').cause, 'cancelled by caller')
+    assert.equal(time.pendingTimers, 0)
   })
 
-  test('pauses at least 1ms, so every 0 lets the fake time move', async ({ assert }) => {
+  test('pauses at least 1ms, so interval 0 lets the fake time move', async ({ assert }) => {
     const clock = new Clock()
-    const time = clock.fake(START)
+    using time = clock.fake(START)
     let observations = 0
 
-    const result = clock.until(() => void observations++, { within: 10, every: 0 })
+    const result = clock.waitFor(() => (++observations, false), { timeout: 10, interval: 0 })
     await time.runAll(100)
 
-    assert.isNull(await result)
+    assert.equal(Result.unwrapErr(await result, 'TimeoutError').timeoutMs, 10)
     assert.equal(observations, 10)
     assert.equal(clock.monotonic(), 10)
   })
@@ -398,51 +524,144 @@ test.group('Clock | until in Tenace', () => {
       while (clock.monotonic() - start < milliseconds);
     }
 
-    const value = await clock.until(
+    const value = await clock.poll(
       () => {
         busy(25)
         return 'late'
       },
-      { within: 5, every: 1 },
+      { until: () => true, timeout: 5 },
     )
-    const error = await clock.until(
+    const error = await clock.waitFor(
       () => {
         busy(25)
         throw new Error('late')
       },
-      { within: 5, every: 1 },
+      { timeout: 5 },
     )
 
-    assert.isNull(value)
-    assert.isNull(error)
+    assert.instanceOf(Result.unwrapErr(value), TimeoutError)
+    assert.instanceOf(Result.unwrapErr(error), TimeoutError)
   })
 
   test('a budget of 0 checks once, on the system time too', async ({ assert }) => {
     const clock = new Clock()
 
-    assert.equal(await clock.until(() => 'ready', { within: 0, every: 1 }), 'ready')
-    assert.isNull(await clock.until(() => undefined, { within: 0, every: 1 }))
-    await assert.rejects(
-      () =>
-        clock.until(
-          () => {
-            throw new Error('down')
-          },
-          { within: 0, every: 1 },
-        ),
-      'down',
+    assert.isTrue((await clock.waitFor(() => true, { timeout: 0 })).ok)
+    assert.instanceOf(
+      Result.unwrapErr(await clock.waitFor(() => false, { timeout: 0 })),
+      TimeoutError,
     )
+    assert.isUndefined(
+      Result.unwrap(await clock.poll(() => undefined, { until: () => true, timeout: 0 })),
+    )
+    const error = await clock.waitFor(
+      () => {
+        throw new Error('down')
+      },
+      { timeout: 0 },
+    )
+    assert.equal(Result.unwrapErr(error, 'UnexpectedError').cause instanceof Error, true)
   })
 
-  test('rejects an invalid every before observing', async ({ assert }) => {
+  test('wraps thrown, rejected and predicate errors without changing their cause', async ({
+    assert,
+  }) => {
     const clock = new Clock()
-    let observed = false
+    using time = clock.fake(START)
+    const cause = new TypeError('invalid health response')
+    const results = [
+      await clock.waitFor(() => {
+        throw cause
+      }),
+      await clock.poll(() => Promise.reject(cause), { until: () => true }),
+      await clock.poll(() => 7, {
+        until: () => {
+          throw cause
+        },
+      }),
+      await clock.poll(() => 7, {
+        until: async () => {
+          throw cause
+        },
+      }),
+      await clock.waitFor(async () => {
+        throw cause
+      }),
+    ]
 
-    await assert.rejects(
-      () => clock.until(() => (observed = true), { within: '1s', every: -1 }),
-      RangeError,
-    )
+    for (const result of results) {
+      assert.strictEqual(Result.unwrapErr(result, 'UnexpectedError').cause, cause)
+    }
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('argument validation returns UnexpectedError before observing', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+    let observed = false
+    const observe = () => (observed = true)
+    const results = [
+      await clock.waitFor(observe, { timeout: -1 }),
+      await clock.poll(observe, { until: () => true, interval: 'invalid' }),
+      await clock.waitFor(observe, { interval: -1 }),
+      await clock.poll(observe, {} as never),
+    ]
+
+    for (const result of results) {
+      const error = Result.unwrapErr(result, 'UnexpectedError')
+      assert.instanceOf(error.cause, Error)
+    }
     assert.isFalse(observed)
+    assert.equal(time.pendingTimers, 0)
+
+    const invalidCondition = await clock.waitFor((() => 'not a boolean') as never)
+    assert.instanceOf(Result.unwrapErr(invalidCondition), UnexpectedError)
+    const invalidBackoff = await clock.waitFor(() => false, { interval: () => -1 })
+    assert.instanceOf(Result.unwrapErr(invalidBackoff, 'UnexpectedError').cause, RangeError)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('poll preserves a Response body and the caller link after success', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+    const caller = new AbortController()
+    let observedSignal: AbortSignal | undefined
+    const server = createServer((request, response) => {
+      response.writeHead(200)
+      if (request.url === '/complete') response.end('ready')
+      else response.write('pending')
+    })
+    server.listen(0, '127.0.0.1')
+    await once(server, 'listening')
+    const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+
+    try {
+      const result = await clock.poll(
+        ({ signal }) => {
+          observedSignal = signal
+          return fetch(`${origin}/complete`, { signal })
+        },
+        { until: response => response.ok, signal: caller.signal },
+      )
+
+      assert.isFalse(observedSignal!.aborted)
+      assert.equal(await Result.unwrap(result).text(), 'ready')
+      assert.equal(time.pendingTimers, 0)
+
+      const pendingBody = await clock.poll(({ signal }) => fetch(`${origin}/stream`, { signal }), {
+        until: response => response.ok,
+        signal: caller.signal,
+      })
+      caller.abort(new Error('caller stopped reading'))
+      assert.strictEqual(observedSignal!.reason, caller.signal.reason)
+      await assert.rejects(() => Result.unwrap(pendingBody).text())
+      assert.equal(time.pendingTimers, 0)
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve())),
+      )
+    }
   })
 })
 

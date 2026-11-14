@@ -1,10 +1,14 @@
 import type { Temporal } from 'temporal-polyfill'
 
+import type { Context } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
+import { CancelledError, TimeoutError, UnexpectedError } from '../errors.ts'
+import type { HandlerError, ValueOfReturn } from '../fold.ts'
 import { raceAbort } from '../internal/race_signal.ts'
+import { Result } from '../result/namespace.ts'
 import { FakeClock } from './fake_clock.ts'
 import { SystemClock } from './system_clock.ts'
-import type { Deadline, TimeSource, UntilOptions } from './types.ts'
+import type { Deadline, PollOptions, TimeSource, WaitForOptions } from './types.ts'
 
 /**
  * Reads the time and waits for it to pass. Code that depends on time
@@ -65,79 +69,165 @@ export class Clock {
   }
 
   /**
-   * Calls `observe` every `every` until it returns a value other than
-   * `undefined`, and returns that value. Returns `null` once `within`
-   * passes, even when the deadline cuts an observation short: the
-   * signal given to `observe` aborts at the deadline and with the
-   * caller.
-   *
-   * When the caller aborts, its reason is thrown. A value observed after
-   * the caller aborted or the deadline passed is dropped, so an
-   * observation that ignores its signal cannot outlive them.
+   * Waits for a boolean condition, or a Result containing one. False
+   * tries again; true returns `Result.ok()`. A returned error is preserved.
+   * Timeouts, cancellation and thrown values also return error Results.
+   * Defaults to a 10-second timeout and a 100ms interval.
+   * The condition's signal aborts when this operation ends, success included.
    *
    * @example
-   * const server = await clock.until(
-   *   async (signal) => {
-   *     const server = await provider.find(id, { signal })
-   *     return server.ready ? server : undefined
-   *   },
-   *   { within: '2 minutes', every: '5s' }
+   * const ready = await clock.waitFor(
+   *   ({ signal }) => deployment.isHealthy({ signal }),
+   *   { timeout: '2 minutes', interval: '5s' }
+   * )
+   * Result.unwrap(ready) // explicitly propagate a failure by throwing
+   */
+  waitFor<R>(
+    condition: (
+      context: Context,
+    ) => R & (ValueOfReturn<Awaited<R>> extends boolean ? unknown : never),
+    options?: WaitForOptions,
+  ): Promise<
+    Result<void, HandlerError<Awaited<R>> | TimeoutError | CancelledError | UnexpectedError>
+  >
+  waitFor<E = never>(
+    condition: (
+      context: Context,
+    ) => boolean | Result<boolean, E> | PromiseLike<boolean | Result<boolean, E>>,
+    options?: WaitForOptions,
+  ): Promise<Result<void, E | TimeoutError | CancelledError | UnexpectedError>>
+  async waitFor<R>(
+    condition: (context: Context) => R,
+    options: WaitForOptions = {},
+  ): Promise<
+    Result<void, HandlerError<Awaited<R>> | TimeoutError | CancelledError | UnexpectedError>
+  > {
+    const controller = new AbortController()
+    try {
+      const signal = options.signal
+        ? AbortSignal.any([options.signal, controller.signal])
+        : controller.signal
+      const result = await this.poll<R>(condition, {
+        ...options,
+        signal,
+        until: value => {
+          if (typeof value !== 'boolean')
+            throw new TypeError('waitFor() expects a boolean condition')
+          return value
+        },
+      })
+      return result.ok ? Result.ok() : result
+    } catch (cause) {
+      return Result.err(new UnexpectedError(cause))
+    } finally {
+      controller.abort()
+    }
+  }
+
+  /**
+   * Observes immediately, then after each interval until the predicate
+   * accepts the unwrapped value. No value is a sentinel: false, null,
+   * undefined and zero are ordinary observations.
+   *
+   * All outcomes are Results. The timeout covers observations that ignore
+   * their signal too. A successful value keeps a live signal, still linked
+   * to the caller, so resources such as Response bodies remain usable.
+   *
+   * @example
+   * const job = await clock.poll(
+   *   ({ signal }) => queue.find(id, { signal }),
+   *   { until: job => job.done, timeout: '2m', interval: '500ms' }
    * )
    */
-  async until<T>(
-    observe: (signal: AbortSignal) => T | undefined | Promise<T | undefined>,
-    options: UntilOptions,
-  ): Promise<T | null> {
-    options.signal?.throwIfAborted()
-
-    const within = toMs(options.within)
-    const every = options.every
-    if (typeof every !== 'function') toMs(every)
-    const end = this.monotonic() + within
-
-    using deadline = this.timeout(within)
-    const signal = options.signal
-      ? AbortSignal.any([options.signal, deadline.signal])
-      : deadline.signal
-
-    // the deadline timer cannot fire during a slow synchronous observation. A
-    // budget of 0 checks once, and relies on the timer alone: two readings of
-    // the system time always differ
-    const expired = (): boolean => deadline.signal.aborted || (within > 0 && this.monotonic() > end)
+  async poll<R>(
+    observe: (context: Context) => R,
+    options: PollOptions<ValueOfReturn<Awaited<R>>>,
+  ): Promise<
+    Result<
+      ValueOfReturn<Awaited<R>>,
+      HandlerError<Awaited<R>> | TimeoutError | CancelledError | UnexpectedError
+    >
+  > {
+    const controller = new AbortController()
+    let caller: AbortSignal | undefined
+    let deadline: Deadline | undefined
+    let timeoutError: TimeoutError | undefined
+    let timeout = 0
+    let end = Number.POSITIVE_INFINITY
+    let succeeded = false
+    let failure: unknown
 
     try {
-      let attempt = 0
-      do {
-        // settles at the deadline or with the caller even when `observe` ignores its signal
-        const value = await raceAbort(async () => observe(signal), signal)
-        options.signal?.throwIfAborted()
+      caller = options.signal
+      caller?.throwIfAborted()
+      if (typeof observe !== 'function')
+        throw new TypeError('poll() expects an observation function')
+      if (typeof options.until !== 'function')
+        throw new TypeError('poll() expects an until predicate')
 
-        if (expired()) {
-          return null
+      timeout = toMs(options.timeout ?? '10s')
+      const interval = options.interval ?? 100
+      if (typeof interval !== 'function') toMs(interval)
+      end = this.monotonic() + timeout
+      timeoutError = new TimeoutError(timeout)
+      deadline = this.timeout(timeout)
+      const signal = AbortSignal.any([
+        controller.signal,
+        deadline.signal,
+        ...(caller ? [caller] : []),
+      ])
+      // A synchronous callback can hold up the deadline timer. A zero budget
+      // still permits one immediate observation, even on the system clock.
+      const expired = (): boolean =>
+        deadline!.signal.aborted || (timeout > 0 && this.monotonic() >= end)
+
+      for (let attempt = 1; ; attempt++) {
+        const result = (await raceAbort(
+          async () => Result.try(() => observe({ signal, attempt })),
+          signal,
+        )) as Result<ValueOfReturn<Awaited<R>>, HandlerError<Awaited<R>> | UnexpectedError>
+        caller?.throwIfAborted()
+        if (expired()) throw timeoutError
+
+        if (!result.ok) {
+          failure = result.error
+          return result
         }
 
-        if (value !== undefined) {
-          return value
+        const ready = await raceAbort(async () => options.until(result.value), signal)
+        if (typeof ready !== 'boolean') throw new TypeError('poll() expects a boolean predicate')
+        caller?.throwIfAborted()
+        if (expired()) throw timeoutError
+
+        if (ready) {
+          succeeded = true
+          return result
         }
 
-        attempt++
-        // at least 1ms, so a pause of 0 cannot stop a fake time from moving
-        const pause = Math.max(toMs(typeof every === 'function' ? every(attempt) : every), 1)
         const left = end - this.monotonic()
-        if (left > 0) {
-          await this.wait(Math.min(pause, left), signal)
-        }
-      } while (this.monotonic() < end)
-
-      return null
-    } catch (error) {
-      options.signal?.throwIfAborted()
-
-      if (expired()) {
-        return null
+        if (left <= 0) throw timeoutError
+        const pause = Math.max(
+          toMs(typeof interval === 'function' ? interval(attempt) : interval),
+          1,
+        )
+        await this.wait(Math.min(pause, left), signal)
+        caller?.throwIfAborted()
+        if (expired()) throw timeoutError
       }
-
-      throw error
+    } catch (cause) {
+      const error = caller?.aborted
+        ? new CancelledError(caller.reason)
+        : timeoutError &&
+            (cause === timeoutError ||
+              deadline?.signal.aborted ||
+              (timeout > 0 && this.monotonic() >= end))
+          ? timeoutError
+          : new UnexpectedError(cause)
+      failure = error
+      return Result.err(error)
+    } finally {
+      deadline?.[Symbol.dispose]()
+      if (!succeeded) controller.abort(failure)
     }
   }
 

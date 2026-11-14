@@ -2,7 +2,7 @@ import type { VerrouAdapterOptions } from '../../src/adapters/verrou.ts'
 import type { BatchOptions, BatchRunOptions } from '../../src/batch.ts'
 import type { ExponentialBackoffOptions, LinearBackoffOptions } from '../../src/backoff.ts'
 import { clock } from '../../src/clock/clock.ts'
-import type { UntilOptions } from '../../src/clock/types.ts'
+import type { PollOptions, WaitForOptions } from '../../src/clock/types.ts'
 import type { ExecutionContextInit } from '../../src/context.ts'
 import type { TenaceEvent } from '../../src/instrumentation.ts'
 import type { ExecuteOptions, PolicyOptions } from '../../src/policy.ts'
@@ -42,7 +42,8 @@ expectType<Equal<RejectsUndefined<ExecuteOptions>, never>>()
 expectType<Equal<RejectsUndefined<PolicyOptions>, never>>()
 expectType<Equal<RejectsUndefined<BatchOptions<unknown>>, never>>()
 expectType<Equal<RejectsUndefined<BatchRunOptions>, never>>()
-expectType<Equal<RejectsUndefined<UntilOptions>, never>>()
+expectType<Equal<RejectsUndefined<WaitForOptions>, never>>()
+expectType<Equal<RejectsUndefined<PollOptions<number>>, never>>()
 expectType<Equal<RejectsUndefined<ExponentialBackoffOptions>, never>>()
 expectType<Equal<RejectsUndefined<LinearBackoffOptions>, never>>()
 expectType<Equal<RejectsUndefined<ExecutionContextInit>, never>>()
@@ -74,4 +75,5 @@ Tenace.policy().withTimeout(1, { mode: undefined })
 await Tenace.all([() => 1], { policy: undefined, concurrency: undefined }).execute({
   signal: opts.signal,
 })
-await clock.until(() => true, { within: 1, every: 1, signal: opts.signal })
+await clock.waitFor(() => true, { timeout: 1, interval: 1, signal: opts.signal })
+await clock.poll(() => 1, { until: value => value > 0, signal: opts.signal })

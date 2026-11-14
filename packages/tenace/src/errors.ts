@@ -114,8 +114,8 @@ function describe(value: unknown): string {
 }
 
 /**
- * A timeout strategy gave up waiting. In aggressive mode (default) it is returned at the
- * deadline even if the function ignores its signal.
+ * A timeout strategy, waitFor, or poll gave up waiting. In aggressive mode (default), a
+ * timeout strategy returns it at the deadline even if the function ignores its signal.
  */
 export class TimeoutError extends TenaceError {
   static readonly tag = 'TimeoutError'
@@ -127,6 +127,21 @@ export class TimeoutError extends TenaceError {
   constructor(timeoutMs: number) {
     super(`Operation timed out after ${timeoutMs}ms`)
     this.timeoutMs = timeoutMs
+  }
+}
+
+/**
+ * A waitFor or poll was cancelled by its caller. The original signal reason is kept in cause.
+ */
+export class CancelledError extends TenaceError {
+  static readonly tag = 'CancelledError'
+  readonly _tag = 'CancelledError' as const
+  readonly code = 'E_CANCELLED' as const
+  declare readonly name: 'CancelledError'
+  declare readonly cause: unknown
+
+  constructor(cause: unknown) {
+    super('Operation cancelled', { cause })
   }
 }
 

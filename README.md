@@ -157,10 +157,14 @@ import { clock } from '@julr/tenace'
 
 declare const healthUrl: string
 
-const healthy = await clock.until(
-  async signal => ((await fetch(healthUrl, { signal })).ok ? true : undefined),
-  { within: '30s', every: '500ms' },
-) // true, or null after 30 seconds
+const healthy = await clock.waitFor(async ({ signal }) => (await fetch(healthUrl, { signal })).ok, {
+  timeout: '30s',
+  interval: '500ms',
+}) // Result<void, TimeoutError | CancelledError | UnexpectedError>
+
+if (!healthy.ok) {
+  console.error(healthy.error)
+}
 ```
 
 ### Test without waiting

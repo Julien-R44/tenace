@@ -10,18 +10,25 @@ import type { Duration } from '../duration.ts'
 export type Deadline = { signal: AbortSignal } & Disposable
 
 /**
- * Options accepted by `clock.until`.
+ * Options accepted by `clock.waitFor` and `clock.poll`.
  */
-export type UntilOptions = {
-  /** How long to keep observing before giving up with `null`. `Infinity` waits until the signal aborts */
-  within: Duration
+export type WaitForOptions = {
+  /** Total time budget, including observations. Defaults to 10 seconds. `Infinity` disables it */
+  timeout?: Duration | undefined
   /**
    * The pause between two observations, 1ms at least, or a function of the 1-based number of
-   * observations done so far, such as `backoff.exponential()`
+   * observations done so far, such as `backoff.exponential()`. Defaults to 100ms
    */
-  every: Duration | ((attempt: number) => Duration)
-  /** Cancels the poll. Its reason is thrown to the caller */
+  interval?: Duration | ((attempt: number) => Duration) | undefined
+  /** Cancels the operation with a `CancelledError` preserving the reason as its cause */
   signal?: AbortSignal | undefined
+}
+
+/**
+ * Options accepted by `clock.poll`. The predicate receives the unwrapped observation.
+ */
+export type PollOptions<T> = WaitForOptions & {
+  until: (value: T) => boolean | PromiseLike<boolean>
 }
 
 /**

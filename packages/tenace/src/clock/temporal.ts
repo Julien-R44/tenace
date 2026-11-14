@@ -2,7 +2,8 @@ import type { Temporal } from 'temporal-polyfill'
 
 /**
  * The native Temporal API (Node.js 26+, Bun), or the "temporal-polyfill"
- * ponyfill elsewhere (Node.js 22 and 24, workerd). The ponyfill is not
+ * ponyfill elsewhere (Node.js 22 and 24, Workers without Temporal). Recent
+ * Workers can expose native Temporal with the `temporal` flag. The ponyfill is not
  * installed on globalThis, so the application globals stay untouched.
  */
 export const temporal: typeof Temporal =
