@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import { setImmediate } from 'node:timers/promises'
 import { clock as sharedClock, Clock } from '../src/clock/clock.ts'
 import { SystemClock } from '../src/clock/system_clock.ts'
+import type { PollOptions } from '../src/clock/types.ts'
 import { CancelledError, TimeoutError, UnexpectedError } from '../src/errors.ts'
 import { sleep } from '../src/internal/sleep.ts'
 import { Result } from '../src/result/namespace.ts'
@@ -317,6 +318,25 @@ test.group('Clock | waitFor and poll', () => {
     assert.equal(time.pendingTimers, 0)
   })
 
+  test('waitFor stays strict when reusing poll options', async ({ assert }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
+    const options: PollOptions<boolean> = {
+      timeout: 10,
+      timeoutMode: 'finish-current',
+      until: value => value,
+    }
+
+    const result = await clock.waitFor(async ({ signal }) => {
+      await clock.wait(20, { signal })
+      return true
+    }, options)
+
+    assert.equal(Result.unwrapErr(result, 'TimeoutError').timeoutMs, 10)
+    assert.equal(clock.monotonic(), 10)
+    assert.equal(time.pendingTimers, 0)
+  })
+
   test('poll returns the unwrapped accepted observation without overlapping calls', async ({
     assert,
   }) => {
@@ -346,6 +366,173 @@ test.group('Clock | waitFor and poll', () => {
     assert.deepEqual(Result.unwrap(result), { id: 'job-7', done: true })
     assert.deepEqual(observedAt, [0, 15, 30])
     assert.equal(clock.monotonic(), 35)
+    assert.equal(time.pendingTimers, 0)
+  })
+
+  test('finish-current keeps a late accepted observation and lets its predicate finish', async ({
+    assert,
+  }) => {
+    const clock = new Clock()
+    using time = clock.fake(START)
+    const caller = new AbortController()
+    const authorization = { id: 'auth-7', status: 'valid' }
+    const accepted = Result.ok(authorization)
+    const observedAt: number[] = []
+    let observedSignal: AbortSignal | undefined
+    let settled = false
+
+    const pending = clock.poll(
+      async ({ signal, attempt }) => {
+        observedSignal = signal
+        observedAt.push(clock.monotonic())
+        if (attempt === 1) return Result.ok({ id: 'auth-7', status: 'pending' })
+        await clock.wait('3s', { signal })
+        return accepted
+      },
+      {
+        until: async value => {
+          if (value.status === 'pending') return false
+          await clock.wait('1s')
+          return true
+        },
+        interval: '59s',
+        timeout: '60s',
+        timeoutMode: 'finish-current',
+        signal: caller.signal,
+      },
+    )
+    void pending.then(() => (settled = true))
+
+    await time.advanceBy('60s')
+    assert.isFalse(settled)
+    assert.isFalse(observedSignal!.aborted)
+    await time.advanceBy('3s')
+
+    assert.strictEqual(await pending, accepted)
+    assert.strictEqual(Result.unwrap(await pending), authorization)
+    assert.deepEqual(observedAt, [0, 59_000])
+    assert.equal(clock.monotonic(), 63_000)
+    assert.isFalse(observedSignal!.aborted)
+    assert.equal(time.pendingTimers, 0)
+
+    caller.abort('resource closed')
+    assert.equal(observedSignal!.reason, 'resource closed')
+  })
+
+  test('finish-current times out without another observation, during or after a pause', async ({
+    assert,
+  }) => {
+    for (const duration of [3, 15]) {
+      const clock = new Clock()
+      using time = clock.fake(START).letTimePass()
+      let observations = 0
+      let observedSignal: AbortSignal | undefined
+
+      const result = await clock.poll(
+        async ({ signal }) => {
+          observations++
+          observedSignal = signal
+          await clock.wait(duration, { signal })
+          return 'pending'
+        },
+        { until: () => false, timeout: 10, interval: 20, timeoutMode: 'finish-current' },
+      )
+
+      assert.equal(Result.unwrapErr(result, 'TimeoutError').timeoutMs, 10)
+      assert.equal(observations, 1)
+      assert.equal(clock.monotonic(), Math.max(duration, 10))
+      assert.isTrue(observedSignal!.aborted)
+      assert.equal(time.pendingTimers, 0)
+    }
+  })
+
+  test('finish-current preserves late business errors and captures late exceptions', async ({
+    assert,
+  }) => {
+    for (const source of ['business', 'observation', 'predicate']) {
+      const clock = new Clock()
+      using time = clock.fake(START).letTimePass()
+      const cause = new Error('authorization unavailable')
+      const failed = Result.err({ _tag: 'AuthorizationGone', id: 'auth-7' })
+
+      const result = await clock.poll(
+        async ({ signal }) => {
+          if (source === 'predicate') return Result.ok('ready')
+          await clock.wait(15, { signal })
+          if (source === 'observation') throw cause
+          return failed
+        },
+        {
+          until: async () => {
+            await clock.wait(15)
+            throw cause
+          },
+          timeout: 10,
+          timeoutMode: 'finish-current',
+        },
+      )
+
+      if (source === 'business') assert.strictEqual(result, failed)
+      else assert.strictEqual(Result.unwrapErr(result, 'UnexpectedError').cause, cause)
+      assert.equal(time.pendingTimers, 0)
+    }
+  })
+
+  test('finish-current still cancels a stalled observation or predicate after the deadline', async ({
+    assert,
+  }) => {
+    for (const source of ['observation', 'predicate']) {
+      const clock = new Clock()
+      using time = clock.fake(START)
+      const caller = new AbortController()
+      const late = Promise.withResolvers<string>()
+      let observedSignal: AbortSignal | undefined
+      let settled = false
+      const pending = clock.poll(
+        ({ signal }) => {
+          observedSignal = signal
+          return source === 'observation' ? late.promise : 'ready'
+        },
+        {
+          until: () => late.promise.then(() => true),
+          timeout: 10,
+          timeoutMode: 'finish-current',
+          signal: caller.signal,
+        },
+      )
+      void pending.then(() => (settled = true))
+
+      await time.advanceBy(15)
+      assert.isFalse(settled)
+      assert.isFalse(observedSignal!.aborted)
+      caller.abort('caller stopped polling')
+
+      assert.equal(
+        Result.unwrapErr(await pending, 'CancelledError').cause,
+        'caller stopped polling',
+      )
+      assert.equal(observedSignal!.reason, 'caller stopped polling')
+      assert.equal(time.pendingTimers, 0)
+      late.reject(new Error('late rejection after cancellation'))
+      await setImmediate()
+    }
+  })
+
+  test('finish-current permits one asynchronous observation with a zero budget', async ({
+    assert,
+  }) => {
+    const clock = new Clock()
+    using time = clock.fake(START).letTimePass()
+    const result = await clock.poll(
+      async ({ signal }) => {
+        await clock.wait(15, { signal })
+        return 0
+      },
+      { until: value => value === 0, timeout: 0, timeoutMode: 'finish-current' },
+    )
+
+    assert.equal(Result.unwrap(result), 0)
+    assert.equal(clock.monotonic(), 15)
     assert.equal(time.pendingTimers, 0)
   })
 
@@ -512,7 +699,11 @@ test.group('Clock | waitFor and poll', () => {
     await setImmediate()
 
     const predicate = Promise.withResolvers<boolean>()
-    const polled = clock.poll(() => 7, { until: () => predicate.promise, timeout: 25 })
+    const polled = clock.poll(() => 7, {
+      until: () => predicate.promise,
+      timeout: 25,
+      timeoutMode: 'strict',
+    })
     await time.advanceBy(25)
 
     assert.equal(Result.unwrapErr(await polled, 'TimeoutError').timeoutMs, 25)
@@ -640,6 +831,7 @@ test.group('Clock | waitFor and poll', () => {
       await clock.poll(observe, { until: () => true, interval: 'invalid' }),
       await clock.waitFor(observe, { interval: -1 }),
       await clock.poll(observe, {} as never),
+      await clock.poll(observe, { until: () => true, timeoutMode: 'cooperative' as never }),
     ]
 
     for (const result of results) {

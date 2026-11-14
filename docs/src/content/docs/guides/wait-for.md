@@ -58,6 +58,36 @@ const empty = await clock.poll(() => queue.pendingCount(), { until: count => cou
 console.log(Result.unwrap(empty)) // 0
 ```
 
+## Let an in-flight read finish after the deadline
+
+By default, `poll()` uses `timeoutMode: 'strict'`. It returns `TimeoutError` at the deadline and aborts the callback signal, even if a read or its `until` predicate is still pending.
+
+To keep the result of a read that finishes after the deadline, set `timeoutMode: 'finish-current'`. For example, poll an ACME authorization until its status is no longer `pending`:
+
+```ts
+import { clock, Result } from '@julr/tenace'
+
+type Authorization = { id: string; status: 'pending' | 'valid' | 'invalid' }
+declare const acme: {
+  readAuthorization(id: string, options: { signal: AbortSignal }): Promise<Authorization>
+}
+
+const result = await clock.poll(({ signal }) => acme.readAuthorization('auth-7', { signal }), {
+  until: authorization => authorization.status !== 'pending',
+  interval: '1s',
+  timeout: '60s',
+  timeoutMode: 'finish-current',
+})
+
+console.log(Result.unwrap(result).status) // 'valid' or 'invalid'
+```
+
+If a read starts at 59 seconds and returns `valid` at 62 seconds, `poll()` keeps that authorization. It does not abort the callback signal at the deadline. It also lets the current asynchronous `until` predicate finish. If the predicate returns false after the budget expires, `poll()` returns `TimeoutError` without reading again. A deadline reached during the interval ends the poll immediately.
+
+Returned business errors remain unchanged, and thrown exceptions still become `UnexpectedError`, including after the deadline. Caller cancellation still returns `CancelledError` immediately and aborts the callback signal. `waitFor()` keeps its strict timeout behavior.
+
+**A stalled read or predicate can exceed the budget indefinitely in this mode.** Set a request timeout on the HTTP client if each read must have a time limit. This mode does not change `withTimeout({ mode: 'cooperative' })`, which aborts its signal at the deadline.
+
 ## Preserve errors returned by your service
 
 A `Result.err(error)` ends the operation immediately. Tenace preserves the business error and its inferred type, without wrapping it or nesting Results. `Result.ok(false)` keeps waiting; `Result.ok(true)` completes `waitFor()` with `Result.ok()`.

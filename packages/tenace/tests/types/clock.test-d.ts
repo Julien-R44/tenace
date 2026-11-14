@@ -70,9 +70,15 @@ const job = await clock.poll(readJob, {
   },
 })
 expectType<Equal<typeof job, Result<{ id: string; ready: boolean }, DeploymentGone | PollError>>>()
-const asyncJob = await clock.poll(async context => readJob(context), { until: job => job.ready })
+const asyncJob = await clock.poll(async context => readJob(context), {
+  until: job => job.ready,
+  timeoutMode: 'finish-current',
+})
 expectType<Equal<typeof asyncJob, typeof job>>()
-const asyncPredicate = await clock.poll(readJob, { until: async job => job.ready })
+const asyncPredicate = await clock.poll(readJob, {
+  until: async job => job.ready,
+  timeoutMode: 'strict',
+})
 expectType<Equal<typeof asyncPredicate, typeof job>>()
 
 const nullable = await clock.poll(() => null as null | undefined | number | false, {
@@ -101,16 +107,24 @@ Result.match(ready, {
 
 const options: WaitForOptions = { timeout: '30s', interval: attempt => attempt * 100 }
 await clock.waitFor(isHealthy, options)
-const pollOptions: PollOptions<number> = { ...options, until: value => value === 0 }
+const pollOptions: PollOptions<number> = {
+  ...options,
+  until: value => value === 0,
+  timeoutMode: 'finish-current',
+}
 await clock.poll(() => 0, pollOptions)
 
 // @ts-expect-error a condition returns a boolean, not a truthy number
 await clock.waitFor(() => 1)
 // @ts-expect-error successful Results must contain a boolean
 await clock.waitFor(async () => Result.ok('ready'))
+// @ts-expect-error waitFor always uses strict timeouts
+await clock.waitFor(isHealthy, { timeoutMode: 'finish-current' })
 // @ts-expect-error poll requires an explicit acceptance predicate
 await clock.poll(readJob, { timeout: '1s' })
 // @ts-expect-error the predicate receives the unwrapped job, not its Result
 await clock.poll(readJob, { until: value => value.ok })
 // @ts-expect-error poll predicates must resolve to a boolean
 await clock.poll(readJob, { until: async () => 'ready' })
+// @ts-expect-error poll timeout modes are strict or finish-current
+await clock.poll(readJob, { until: job => job.ready, timeoutMode: 'cooperative' })

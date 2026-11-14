@@ -50,6 +50,14 @@ export type WaitForOptions = TimerOptions & {
  */
 export type PollOptions<T> = WaitForOptions & {
   until: (value: T) => boolean | PromiseLike<boolean>
+  /**
+   * `strict` (default) ends at the deadline, including during an observation or predicate.
+   * `finish-current` lets the current observation and predicate finish without aborting
+   * their signal. An accepted value is kept even after the deadline; otherwise the poll
+   * times out without observing again. A stalled callback can exceed the budget forever.
+   * Caller cancellation still ends the poll immediately in either mode.
+   */
+  timeoutMode?: 'strict' | 'finish-current' | undefined
 }
 
 /**

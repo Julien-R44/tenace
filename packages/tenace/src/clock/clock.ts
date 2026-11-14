@@ -121,6 +121,7 @@ export class Clock {
         : controller.signal
       const result = await this.poll<R>(condition, {
         ...options,
+        timeoutMode: 'strict',
         signal,
         until: value => {
           if (typeof value !== 'boolean')
@@ -141,9 +142,12 @@ export class Clock {
    * accepts the unwrapped value. No value is a sentinel: false, null,
    * undefined and zero are ordinary observations.
    *
-   * All outcomes are Results. The timeout covers observations that ignore
-   * their signal too. A successful value keeps a live signal, still linked
-   * to the caller, so resources such as Response bodies remain usable.
+   * All outcomes are Results. By default, the timeout covers observations
+   * that ignore their signal too. `timeoutMode: 'finish-current'` lets the
+   * current observation and predicate finish, accepting a late success
+   * without starting another observation after the deadline. Caller cancellation
+   * still ends the poll immediately. A successful value keeps a live signal,
+   * still linked to the caller, so resources such as Response bodies remain usable.
    * `ref: false` applies to its deadline and its pauses alike.
    *
    * @example
@@ -166,6 +170,7 @@ export class Clock {
     let deadline: Deadline | undefined
     let timeoutError: TimeoutError | undefined
     let timeout = 0
+    let finishCurrent = false
     let end = Number.POSITIVE_INFINITY
     let succeeded = false
     let failure: unknown
@@ -177,6 +182,11 @@ export class Clock {
         throw new TypeError('poll() expects an observation function')
       if (typeof options.until !== 'function')
         throw new TypeError('poll() expects an until predicate')
+      const timeoutMode = options.timeoutMode ?? 'strict'
+      if (timeoutMode !== 'strict' && timeoutMode !== 'finish-current') {
+        throw new RangeError(`Invalid timeoutMode: ${String(timeoutMode)}`)
+      }
+      finishCurrent = timeoutMode === 'finish-current'
 
       timeout = toMs(options.timeout ?? '10s')
       const interval = options.interval ?? 100
@@ -186,9 +196,10 @@ export class Clock {
       deadline = this.timeout(timeout, { ref: options.ref })
       const signal = AbortSignal.any([
         controller.signal,
-        deadline.signal,
+        ...(finishCurrent ? [] : [deadline.signal]),
         ...(caller ? [caller] : []),
       ])
+      const waitSignal = finishCurrent ? AbortSignal.any([signal, deadline.signal]) : signal
       // A synchronous callback can hold up the deadline timer. A zero budget
       // still permits one immediate observation, even on the system clock.
       const expired = (): boolean =>
@@ -200,7 +211,7 @@ export class Clock {
           signal,
         )) as Result<ValueOfReturn<Awaited<R>>, HandlerError<Awaited<R>> | UnexpectedError>
         caller?.throwIfAborted()
-        if (expired()) throw timeoutError
+        if (!finishCurrent && expired()) throw timeoutError
 
         if (!result.ok) {
           failure = result.error
@@ -210,7 +221,7 @@ export class Clock {
         const ready = await raceAbort(async () => options.until(result.value), signal)
         if (typeof ready !== 'boolean') throw new TypeError('poll() expects a boolean predicate')
         caller?.throwIfAborted()
-        if (expired()) throw timeoutError
+        if (!finishCurrent && expired()) throw timeoutError
 
         if (ready) {
           succeeded = true
@@ -223,7 +234,12 @@ export class Clock {
           toMs(typeof interval === 'function' ? interval(attempt) : interval),
           1,
         )
-        await this.wait(Math.min(pause, left), { signal, ref: options.ref })
+        await this.wait(Math.min(pause, left), { signal: waitSignal, ref: options.ref }).catch(
+          cause => {
+            if (deadline!.signal.aborted) throw timeoutError
+            throw cause
+          },
+        )
         caller?.throwIfAborted()
         if (expired()) throw timeoutError
       }
@@ -232,8 +248,8 @@ export class Clock {
         ? new CancelledError(caller.reason)
         : timeoutError &&
             (cause === timeoutError ||
-              deadline?.signal.aborted ||
-              (timeout > 0 && this.monotonic() >= end))
+              (!finishCurrent &&
+                (deadline?.signal.aborted || (timeout > 0 && this.monotonic() >= end))))
           ? timeoutError
           : new UnexpectedError(cause)
       failure = error
