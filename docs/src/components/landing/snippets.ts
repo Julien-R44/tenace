@@ -79,17 +79,17 @@ const restore = Tenace.chaos({
   throws: () => new Error('users API down'),
 })`
 
-export const testing = `import { TestClock } from '@julr/tenace/testing'
+export const testing = `import { clock } from '@julr/tenace'
 
-const clock = new TestClock()
+using time = clock.fake()
 const policy = Tenace.policy()
   .withTimeout('1s')
   .withRetry({ retries: 2, delay: '100ms' })
 
 const hang = () => new Promise<never>(() => {})
-const done = policy.settle(hang, { clock })
+const done = policy.settle(hang)
 
-await clock.runAll() // 3 timeouts, 2 delays, 0ms
+await time.runAll() // 3 timeouts, 2 delays, 0ms
 const result = await done // a TimeoutError`
 
 export const observe = `import { openTelemetry } from '@julr/tenace-otel'

@@ -7,6 +7,7 @@
     "test": "pnpm -r test",
     "test:bun": "pnpm -r test:bun",
     "test:workerd": "pnpm --filter @julr/tenace build && node scripts/workerd_smoke.ts",
+    "test:workerd:native": "pnpm --filter @julr/tenace build && pnpm --package=workerd@1.20261104.1 dlx --shell-mode 'MINIFLARE_WORKERD_PATH=$(command -v workerd) node scripts/workerd_smoke.ts --native-temporal'",
     "typecheck": "tsc -p tsconfig.json && pnpm -r typecheck",
     "typecheck:ts5": "node node_modules/typescript-5/bin/tsc -p tsconfig.json && pnpm -r typecheck:ts5",
     "lint": "oxlint",
@@ -29,6 +30,7 @@
     "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2004",
     "publint": "^0.3.25",
+    "rolldown": "catalog:",
     "typescript": "catalog:",
     "typescript-5": "catalog:"
   },

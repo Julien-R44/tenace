@@ -6,11 +6,13 @@ export {
   type Jitter,
   type LinearBackoffOptions,
 } from './backoff.ts'
-export { type Clock, systemClock, type TimerHandle } from './clock.ts'
+export { Clock, clock } from './clock/clock.ts'
+export type { Deadline, PollOptions, TimeSource, WaitForOptions } from './clock/types.ts'
 export { type Context, ExecutionContext, type ExecutionContextInit } from './context.ts'
 export { type Duration, type DurationUnit, toMs } from './duration.ts'
 export {
   BulkheadFullError,
+  CancelledError,
   ChaosError,
   CircuitOpenError,
   type CircuitRejectionState,
@@ -117,4 +119,3 @@ export { Timeout, type TimeoutOptions } from './strategies/timeout.ts'
 export { type AnyOp, type AnyStrategy, type Next, type Op, Strategy } from './strategy.ts'
 export { Tenace, type TenaceEntry } from './tenace.ts'
 export type { ByTag, TagOf } from './types.ts'
-export { waitFor, type WaitForOptions } from './wait_for.ts'

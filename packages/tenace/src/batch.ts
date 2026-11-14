@@ -1,4 +1,4 @@
-import type { Clock } from './clock.ts'
+import type { Clock } from './clock/clock.ts'
 import type { Context } from './context.ts'
 import { linkSignal } from './internal/signal.ts'
 import type { AnyPolicy, Fn } from './policy.ts'

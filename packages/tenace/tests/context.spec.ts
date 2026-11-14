@@ -1,22 +1,22 @@
 import { test } from '@japa/runner'
 
-import { systemClock } from '../src/clock.ts'
+import { clock } from '../src/clock/clock.ts'
 import { ExecutionContext } from '../src/context.ts'
 import type { Result } from '../src/result/namespace.ts'
 import { type Next, Strategy } from '../src/strategy.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 test.group('ExecutionContext', () => {
   test('defaults to attempt 1 and the system clock', ({ assert }) => {
     const context = new ExecutionContext({ signal: new AbortController().signal })
     assert.equal(context.attempt, 1)
-    assert.strictEqual(context.clock, systemClock)
+    assert.strictEqual(context.clock, clock)
   })
 
   test('with() derives a new context and leaves the original untouched', ({ assert }) => {
     const signal = new AbortController().signal
-    const clock = new TestClock()
+    const { clock } = fakeClock()
     const base = new ExecutionContext({ signal, clock })
     const child = new AbortController().signal
 

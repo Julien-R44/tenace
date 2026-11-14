@@ -12,7 +12,7 @@ import {
 } from '../src/strategies/circuit_breaker/store.ts'
 import { type BreakerConfig, circuitBreakerMachine, type MachineState } from '../src/index.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 const fail = () => {
   throw new Error('down')
@@ -20,10 +20,10 @@ const fail = () => {
 const succeed = () => 'up'
 
 function setup(options: ConstructorParameters<typeof CircuitBreaker>[0] = {}) {
-  const clock = new TestClock()
+  const { clock, time } = fakeClock()
   const breaker = new CircuitBreaker({ trip: { consecutive: 2 }, openFor: 1000, clock, ...options })
   const policy = Tenace.policy().with(breaker)
-  return { clock, breaker, policy }
+  return { clock, time, breaker, policy }
 }
 
 /**
@@ -41,14 +41,14 @@ function pending() {
 
 test.group('CircuitBreaker | closed and open', () => {
   test('opens after consecutive failures and rejects without calling fn', async ({ assert }) => {
-    const { breaker, policy, clock } = setup()
+    const { breaker, policy, time } = setup()
     await policy.settle(fail)
     assert.equal(breaker.state, 'closed')
     await policy.settle(fail)
     assert.equal(breaker.state, 'open')
 
     let called = false
-    await clock.advance(400)
+    await time.advanceBy(400)
     const result = await policy.settle(() => (called = true))
     assert.isFalse(called)
     assert.isFalse(result.ok)
@@ -86,10 +86,10 @@ test.group('CircuitBreaker | closed and open', () => {
 
 test.group('CircuitBreaker | half-open', () => {
   test('admits one trial call after openFor, closes on success', async ({ assert }) => {
-    const { breaker, policy, clock } = setup()
+    const { breaker, policy, time } = setup()
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     assert.equal(breaker.state, 'half-open')
 
     const probe = pending()
@@ -105,17 +105,17 @@ test.group('CircuitBreaker | half-open', () => {
 
   test('reopens when the trial call fails, with a dynamic open duration', async ({ assert }) => {
     const openFor = backoff.exponential({ base: 1000, jitter: 'none' })
-    const { breaker, policy, clock } = setup({ openFor })
+    const { breaker, policy, time } = setup({ openFor })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
 
     await policy.settle(fail)
     assert.equal(breaker.state, 'open')
     const rejected = await policy.settle(succeed)
     assert.equal((rejected as { error: CircuitOpenError }).error.retryAfterMs, 2000)
 
-    await clock.advance(2000)
+    await time.advanceBy(2000)
     await policy.settle(succeed)
     assert.equal(breaker.state, 'closed')
 
@@ -127,10 +127,10 @@ test.group('CircuitBreaker | half-open', () => {
   })
 
   test('permits and successes control the trial calls', async ({ assert }) => {
-    const { breaker, policy, clock } = setup({ halfOpen: { permits: 2, successes: 2 } })
+    const { breaker, policy, time } = setup({ halfOpen: { permits: 2, successes: 2 } })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
 
     const a = pending()
     const b = pending()
@@ -147,18 +147,18 @@ test.group('CircuitBreaker | half-open', () => {
   })
 
   test('a trial call running longer than maxWait counts as a failure', async ({ assert }) => {
-    const { breaker, policy, clock } = setup({ halfOpen: { maxWait: 500 } })
+    const { breaker, policy, time } = setup({ halfOpen: { maxWait: 500 } })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
 
     const hanging = pending()
     const trial = policy.settle(hanging.fn)
-    await clock.advance(499)
+    await time.advanceBy(499)
     const rejected = await policy.settle(succeed)
     assert.equal((rejected as { error: CircuitOpenError }).error.retryAfterMs, 1)
 
-    await clock.advance(1)
+    await time.advanceBy(1)
     const reopened = await policy.settle(succeed)
     assert.equal((reopened as { error: CircuitOpenError }).error.state, 'open')
     assert.equal(breaker.state, 'open')
@@ -170,14 +170,14 @@ test.group('CircuitBreaker | half-open', () => {
   })
 
   test('a trial call succeeding after maxWait reopens the circuit', async ({ assert }) => {
-    const { breaker, policy, clock } = setup({ halfOpen: { maxWait: 500 } })
+    const { breaker, policy, time } = setup({ halfOpen: { maxWait: 500 } })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
 
     const slow = pending()
     const trial = policy.settle(slow.fn)
-    await clock.advance(600)
+    await time.advanceBy(600)
     slow.resolve('late')
     await trial
     assert.equal(breaker.state, 'open')
@@ -242,7 +242,7 @@ test.group('CircuitBreaker | classification', () => {
   })
 
   test('a trial call that rejects with a bug frees its permit', async ({ assert }) => {
-    const { breaker, clock } = setup()
+    const { breaker, time } = setup()
     const buggy = Tenace.policy()
       .withFallback(() => {
         throw new Error('bug')
@@ -254,7 +254,7 @@ test.group('CircuitBreaker | classification', () => {
     const policy = Tenace.policy().with(breaker)
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     await buggy.settle(fail).catch(() => {})
     assert.deepEqual(await policy.settle(succeed), Result.ok('up'))
     assert.equal(breaker.state, 'closed')
@@ -307,12 +307,12 @@ test.group('CircuitBreaker | isolate and events', () => {
 
   test('onStateChange reports transitions', async ({ assert }) => {
     const events: string[] = []
-    const { policy, clock, breaker } = setup({
+    const { policy, time, breaker } = setup({
       onStateChange: ({ from, to }) => events.push(`${from}->${to}`),
     })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     await policy.settle(succeed)
     const release = await breaker.isolate()
     await release()
@@ -383,7 +383,7 @@ test.group('CircuitBreaker | isolate and events', () => {
       return reads[index]!
     }
     const events: string[] = []
-    const { policy, clock, breaker } = setup({
+    const { policy, time, breaker } = setup({
       trip: { consecutive: 1 },
       store,
       onStateChange: ({ from, to }) => events.push(`${from}->${to}`),
@@ -394,7 +394,7 @@ test.group('CircuitBreaker | isolate and events', () => {
     const opened = await read(1)
     assert.equal(opened.value, 'open')
 
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     const succeeded = policy.settle(succeed)
     ;(await read(2)).resolve()
     const closed = await read(3)
@@ -414,15 +414,15 @@ test.group('CircuitBreaker | isolate and events', () => {
   test('an outer retry listing CircuitOpenError waits for the circuit to admit calls again', async ({
     assert,
   }) => {
-    const { clock, breaker } = setup()
+    const { clock, time, breaker } = setup()
     const policy = Tenace.policy()
       .with(breaker)
       .withRetry({ retries: 3, delay: 10, retryOn: ['UnexpectedError', 'CircuitOpenError'] })
     let calls = 0
     const settled = policy.settle(() => (++calls <= 2 ? fail() : 'recovered'), { clock })
 
-    await clock.advance(10)
-    await clock.advance(1000)
+    await time.advanceBy(10)
+    await time.advanceBy(1000)
     assert.deepEqual(await settled, Result.ok('recovered'))
     assert.equal(calls, 3)
     assert.equal(breaker.state, 'closed')
@@ -561,11 +561,11 @@ test.group('CircuitBreaker | store and options', () => {
       },
     }
 
-    const { policy, breaker, clock } = setup({ store })
+    const { policy, breaker, time } = setup({ store })
     await policy.settle(fail)
     await policy.settle(fail)
     assert.equal(await breaker.getState(), 'open')
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     assert.deepEqual(await policy.settle(succeed), Result.ok('up'))
     assert.equal(await breaker.getState(), 'closed')
   })
@@ -621,20 +621,20 @@ test.group('CircuitBreaker | rate windows', () => {
   })
 
   test('time window: counts the calls of the last duration only', async ({ assert }) => {
-    const { breaker, policy, clock } = setup({
+    const { breaker, policy, time } = setup({
       trip: { rate: 0.5, duration: '10s', minimumCalls: 4, buckets: 10 },
     })
     await policy.settle(fail)
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(10_000)
+    await time.advanceBy(10_000)
 
     // the 3 failures expired: 1 failure out of 4 calls
     for (const fn of [succeed, succeed, succeed, fail]) await policy.settle(fn)
     assert.equal(breaker.state, 'closed')
 
     // still in the window: 2 failures out of 5, then 3 out of 6
-    await clock.advance(5000)
+    await time.advanceBy(5000)
     await policy.settle(fail)
     assert.equal(breaker.state, 'closed')
     await policy.settle(fail)
@@ -642,10 +642,10 @@ test.group('CircuitBreaker | rate windows', () => {
   })
 
   test('the window restarts empty after the circuit closes', async ({ assert }) => {
-    const { breaker, policy, clock } = setup({ trip: { rate: 0.5, calls: 2 } })
+    const { breaker, policy, time } = setup({ trip: { rate: 0.5, calls: 2 } })
     await policy.settle(fail)
     await policy.settle(fail)
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     await policy.settle(succeed)
     assert.equal(breaker.state, 'closed')
     await policy.settle(fail)

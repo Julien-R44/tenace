@@ -16,7 +16,7 @@ import type { EventMessage, ExecutionMessage } from '../src/internal/diagnostics
 import { Result } from '../src/result/namespace.ts'
 import { CircuitBreaker } from '../src/strategies/circuit_breaker/circuit_breaker.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 function recorder() {
   const events: TenaceEvent[] = []
@@ -288,13 +288,13 @@ test.group('Instrumentation | events', () => {
   })
 
   test('timeout and fallback events', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { types, instrumentation } = recorder()
     const done = Tenace.policy({ instrumentation })
       .withTimeout(10)
       .withFallbackOn(['TimeoutError'], error => error instanceof TimeoutError)
       .execute(() => new Promise(() => {}), { clock })
-    await clock.advance(10)
+    await time.advanceBy(10)
     assert.isTrue(await done)
     assert.deepEqual(types(), ['timeout', 'fallback.used'])
   })
@@ -304,7 +304,7 @@ test.group('Instrumentation | events', () => {
     const breaker = new CircuitBreaker({
       name: 'users-api',
       trip: { consecutive: 1 },
-      clock: new TestClock(),
+      clock: fakeClock().clock,
     })
     const policy = Tenace.policy({ instrumentation }).with(breaker)
     await policy.settle(() => Result.err('down'))

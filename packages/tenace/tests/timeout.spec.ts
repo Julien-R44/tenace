@@ -1,11 +1,11 @@
 import { test } from '@japa/runner'
 
 import { TimeoutError } from '../src/errors.ts'
-import { systemClock } from '../src/clock.ts'
+import { clock } from '../src/clock/clock.ts'
 import { Result } from '../src/result/namespace.ts'
 import { Timeout } from '../src/strategies/timeout.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 import { sleep } from '../src/internal/sleep.ts'
 import { Twice } from './helpers/strategies.ts'
 
@@ -21,7 +21,7 @@ async function captureReported(run: () => Promise<void>): Promise<unknown[]> {
   holder.reportError = error => reported.push(error)
   try {
     await run()
-    await sleep(systemClock, 1)
+    await sleep(clock, 1)
     return reported
   } finally {
     if (original) holder.reportError = original
@@ -31,7 +31,7 @@ async function captureReported(run: () => Promise<void>): Promise<unknown[]> {
 
 test.group('Timeout | aggressive', () => {
   test('returns TimeoutError at the deadline even if fn ignores its signal', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     let fnSignal: AbortSignal | undefined
     const settled = Tenace.policy()
       .withTimeout(100)
@@ -43,9 +43,9 @@ test.group('Timeout | aggressive', () => {
         { clock },
       )
 
-    await clock.advance(99)
+    await time.advanceBy(99)
     assert.isFalse(fnSignal?.aborted)
-    await clock.advance(1)
+    await time.advanceBy(1)
 
     const result = await settled
     assert.isFalse(result.ok)
@@ -59,12 +59,12 @@ test.group('Timeout | aggressive', () => {
   test('keeps the result of a function faster than the deadline and clears its timer', async ({
     assert,
   }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const result = await Tenace.policy()
       .withTimeout('1s')
       .settle(() => 'fast', { clock })
     assert.deepEqual(result, Result.ok('fast'))
-    assert.equal(clock.pendingTimers, 0)
+    assert.equal(time.pendingTimers, 0)
   })
 
   test('works on the system clock', async ({ assert }) => {
@@ -104,19 +104,19 @@ test.group('Timeout | aggressive', () => {
   })
 
   test('stops waiting and clears its timer as soon as the caller aborts', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const controller = new AbortController()
     const settled = Tenace.policy()
       .withTimeout('3s')
       .settle(never, { clock, signal: controller.signal })
     controller.abort('stop')
     assert.equal(await settled.catch((error: unknown) => error), 'stop')
-    await clock.advance(0)
-    assert.equal(clock.pendingTimers, 0)
+    await time.advanceBy(0)
+    assert.equal(time.pendingTimers, 0)
   })
 
   test('a defect after the deadline is reported', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const bug = new Error('bug in mapper')
     const reported = await captureReported(async () => {
       const settled = Tenace.policy()
@@ -125,26 +125,26 @@ test.group('Timeout | aggressive', () => {
         })
         .withTimeout(10)
         .settle(
-          () => new Promise(resolve => clock.setTimeout(() => resolve(Result.err('late')), 20)),
+          () => new Promise(resolve => void clock.wait(20).then(() => resolve(Result.err('late')))),
           {
             clock,
           },
         )
-      await clock.advance(10)
+      await time.advanceBy(10)
       const result = await settled
       assert.instanceOf(!result.ok && result.error, TimeoutError)
-      await clock.advance(10)
+      await time.advanceBy(10)
     })
     assert.deepEqual(reported, [bug])
   })
 
   test('Infinity disables the timer', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const result = await Tenace.policy()
       .withTimeout(Number.POSITIVE_INFINITY)
       .settle(
         async ctx => {
-          assert.equal(clock.pendingTimers, 0)
+          assert.equal(time.pendingTimers, 0)
           return ctx.signal.aborted
         },
         { clock },
@@ -168,7 +168,7 @@ test.group('Timeout | aggressive', () => {
 
 test.group('Timeout | cooperative', () => {
   test('aborts at the deadline but waits for the function to settle', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     let finished = false
     const settled = Tenace.policy()
       .withTimeout(100, { mode: 'cooperative' })
@@ -181,15 +181,15 @@ test.group('Timeout | cooperative', () => {
         { clock },
       )
 
-    await clock.advance(100)
-    await clock.advance(50)
+    await time.advanceBy(100)
+    await time.advanceBy(50)
     const result = await settled
     assert.isTrue(finished)
     assert.isTrue(!result.ok && result.error instanceof TimeoutError)
   })
 
   test('keeps a success that arrives after the deadline', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const settled = Tenace.policy()
       .withTimeout(100, { mode: 'cooperative' })
       .settle(
@@ -199,7 +199,7 @@ test.group('Timeout | cooperative', () => {
         },
         { clock },
       )
-    await clock.advance(150)
+    await time.advanceBy(150)
     assert.deepEqual(await settled, Result.ok(true))
   })
 })
@@ -208,10 +208,10 @@ test.group('Timeout | position', () => {
   test('inside a repeating strategy it bounds each attempt, outside it bounds the total', async ({
     assert,
   }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const starts: number[] = []
     const fn = async ({ signal }: { signal: AbortSignal }) => {
-      starts.push(clock.now())
+      starts.push(clock.monotonic())
       await sleep(clock, 80, signal)
       signal.throwIfAborted()
       return 'done'
@@ -219,7 +219,7 @@ test.group('Timeout | position', () => {
 
     const perAttempt = Tenace.policy().withTimeout(50).with(new Twice())
     const settledPerAttempt = perAttempt.settle(fn, { clock })
-    await clock.advance(200)
+    await time.advanceBy(200)
     const r1 = await settledPerAttempt
     assert.isTrue(!r1.ok && r1.error instanceof TimeoutError)
     assert.deepEqual(starts, [0, 50])
@@ -227,7 +227,7 @@ test.group('Timeout | position', () => {
     starts.length = 0
     const total = Tenace.policy().with(new Twice()).withTimeout(100)
     const settledTotal = total.settle(fn, { clock })
-    await clock.advance(200)
+    await time.advanceBy(200)
     const r2 = await settledTotal
     assert.isTrue(!r2.ok && r2.error instanceof TimeoutError)
     assert.deepEqual(starts, [200, 280])

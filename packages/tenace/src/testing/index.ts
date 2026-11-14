@@ -1,1 +1,1 @@
-export { TestClock } from './test_clock.ts'
+export { FakeClock } from '../clock/fake_clock.ts'

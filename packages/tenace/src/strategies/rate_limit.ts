@@ -1,4 +1,4 @@
-import type { Clock } from '../clock.ts'
+import type { Clock } from '../clock/clock.ts'
 import type { ExecutionContext } from '../context.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { RateLimitError, UnexpectedError } from '../errors.ts'
@@ -143,12 +143,12 @@ export class RateLimit extends Strategy<RateLimitError> {
   async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     const key = this.#key ?? context.key ?? 'default'
     const clock = this.#clock ?? context.clock
-    const deadline = clock.now() + this.#maxWaitMs
+    const deadline = clock.monotonic() + this.#maxWaitMs
 
     for (;;) {
       let decision: RateLimitDecision
       try {
-        decision = await this.#store.consume(key, clock.now())
+        decision = await this.#store.consume(key, clock.now().epochMilliseconds)
       } catch (error) {
         return Result.err(new UnexpectedError(error))
       }
@@ -159,7 +159,7 @@ export class RateLimit extends Strategy<RateLimitError> {
       if (
         retryAfterMs === undefined ||
         this.#maxWaitMs <= 0 ||
-        clock.now() + retryAfterMs > deadline
+        clock.monotonic() + retryAfterMs > deadline
       ) {
         context.emit({ type: 'rate_limit.rejected', key, retryAfterMs })
         return Result.err(new RateLimitError(key, retryAfterMs))

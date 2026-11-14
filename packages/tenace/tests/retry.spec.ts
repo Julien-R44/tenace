@@ -14,7 +14,8 @@ import { Result } from '../src/result/namespace.ts'
 import { Retry } from '../src/strategies/retry.ts'
 import { RetryBudget } from '../src/strategies/retry_budget.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import type { Clock } from '../src/clock/clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 import { NotFound } from './helpers/strategies.ts'
 
 class RateLimited extends TenaceError {
@@ -31,10 +32,10 @@ class RateLimited extends TenaceError {
 /**
  * A function failing `failures` times before succeeding, recording attempts and times.
  */
-function flaky(failures: number, clock?: TestClock) {
+function flaky(failures: number, clock?: Clock) {
   const calls: { attempt: number; at: number }[] = []
   const fn = ({ attempt }: { attempt: number }) => {
-    calls.push({ attempt, at: clock?.now() ?? 0 })
+    calls.push({ attempt, at: clock?.monotonic() ?? 0 })
     if (calls.length <= failures) throw new Error(`failure ${calls.length}`)
     return `success after ${calls.length}`
   }
@@ -199,10 +200,10 @@ test.group('Retry | classification', () => {
   })
 
   test('waits a fixed delay between attempts', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { fn, calls } = flaky(2, clock)
     const done = Tenace.policy().withRetry({ retries: 3, delay: '200ms' }).execute(fn, { clock })
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     await done
     assert.deepEqual(
       calls.map(call => call.at),
@@ -211,7 +212,7 @@ test.group('Retry | classification', () => {
   })
 
   test('a delay function receives the failed attempt and its error', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { fn, calls } = flaky(3, clock)
     const seen: [number, string][] = []
     const done = Tenace.policy()
@@ -223,7 +224,7 @@ test.group('Retry | classification', () => {
         },
       })
       .execute(fn, { clock })
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     await done
     assert.deepEqual(seen, [
       [1, 'failure 1'],
@@ -237,30 +238,30 @@ test.group('Retry | classification', () => {
   })
 
   test('waits at least retryAfterMs when the error has one', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const times: number[] = []
     const fn = () => {
-      times.push(clock.now())
+      times.push(clock.monotonic())
       return times.length === 1 ? Result.err(new RateLimited(1000)) : Result.ok('ok')
     }
 
     const done = Tenace.policy().withRetry({ retries: 1, delay: 10 }).execute(fn, { clock })
-    await clock.advance(2000)
+    await time.advanceBy(2000)
     await done
     assert.deepEqual(times, [0, 1000])
 
     times.length = 0
-    const start = clock.now()
+    const start = clock.monotonic()
     const ignored = Tenace.policy()
       .withRetry({ retries: 1, delay: 10, respectRetryAfter: false })
       .execute(fn, { clock })
-    await clock.advance(2000)
+    await time.advanceBy(2000)
     await ignored
     assert.deepEqual(times, [start, start + 10])
   })
 
   test('maxDelay caps the delay, retryAfterMs included', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const delays: number[] = []
     const done = Tenace.policy()
       .withRetry({
@@ -270,7 +271,7 @@ test.group('Retry | classification', () => {
         onRetry: event => delays.push(event.delayMs),
       })
       .settle(() => Result.err(new RateLimited(3_000_000_000)), { clock })
-    await clock.advance('2s')
+    await time.advanceBy('2s')
     await done
     assert.deepEqual(delays, [1000, 1000])
   })
@@ -310,10 +311,10 @@ test.group('Retry | classification', () => {
   })
 
   test('uses an exponential backoff with jitter by default', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { fn, calls } = flaky(3, clock)
     const done = Tenace.policy().withRetry({ retries: 3 }).execute(fn, { clock })
-    await clock.advance(10_000)
+    await time.advanceBy(10_000)
     await done
     const [a, b, c, d] = calls.map(call => call.at) as [number, number, number, number]
     assert.isAtMost(b - a, 100)
@@ -380,11 +381,11 @@ test.group('Retry | values', () => {
   })
 
   test('delay sees the cause, so a response can set the delay', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const times: number[] = []
     let calls = 0
     const fn = () => {
-      times.push(clock.now())
+      times.push(clock.monotonic())
       return ++calls === 1 ? { status: 429, retryAfter: 2000 } : { status: 200, retryAfter: 0 }
     }
     const done = Tenace.call(fn)
@@ -394,7 +395,7 @@ test.group('Retry | values', () => {
         delay: (_attempt, cause) => ('value' in cause ? cause.value.retryAfter : 10),
       })
       .execute({ clock })
-    await clock.advance('2s')
+    await time.advanceBy('2s')
     assert.deepEqual(await done, { status: 200, retryAfter: 0 })
     assert.deepEqual(times, [0, 2000])
   })
@@ -415,23 +416,23 @@ test.group('Retry | values', () => {
 
 test.group('Retry | abort', () => {
   test('stops waiting and retrying as soon as the caller aborts', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const controller = new AbortController()
     const { fn, calls } = flaky(10, clock)
     const settled = Tenace.policy()
       .withRetry({ retries: 5, delay: '1s' })
       .settle(fn, { clock, signal: controller.signal })
 
-    await clock.advance(500)
+    await time.advanceBy(500)
     controller.abort('stop')
     assert.equal(await settled.catch((error: unknown) => error), 'stop')
-    await clock.advance(10_000)
+    await time.advanceBy(10_000)
     assert.lengthOf(calls, 1)
-    assert.equal(clock.pendingTimers, 0)
+    assert.equal(time.pendingTimers, 0)
   })
 
   test('a timeout inside the retry bounds each attempt', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     let calls = 0
     const settled = Tenace.policy()
       .withTimeout(100)
@@ -444,20 +445,20 @@ test.group('Retry | abort', () => {
         },
         { clock },
       )
-    await clock.advance(300)
+    await time.advanceBy(300)
     const result = await settled
     assert.equal(calls, 3)
     assert.isTrue(!result.ok && result.error instanceof TimeoutError)
   })
 
   test('a timeout outside the retry stops the retries when it fires', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { fn, calls } = flaky(10, clock)
     const settled = Tenace.policy()
       .withRetry({ retries: 10, delay: 100 })
       .withTimeout(250)
       .settle(fn, { clock })
-    await clock.advance(5000)
+    await time.advanceBy(5000)
     const result = await settled
     assert.isTrue(!result.ok && result.error instanceof TimeoutError)
     assert.deepEqual(
@@ -469,7 +470,7 @@ test.group('Retry | abort', () => {
 
 test.group('Retry | budget', () => {
   test('caps retries to a share of executions', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock } = fakeClock()
     const budget = new RetryBudget({ ratio: 0.5, minPerSecond: 0, clock })
     const policy = Tenace.policy().withRetry({ retries: 1, delay: 0, budget })
 
@@ -483,17 +484,17 @@ test.group('Retry | budget', () => {
   })
 
   test('the window slides and minPerSecond allows retries without traffic', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const budget = new RetryBudget({ ratio: 0, minPerSecond: 0.1, window: '10s', clock })
 
     assert.isTrue(budget.tryAcquire())
     assert.isFalse(budget.tryAcquire())
-    await clock.advance(10_000)
+    await time.advanceBy(10_000)
     assert.isTrue(budget.tryAcquire())
   })
 
   test('uses the clock of the execution when it has none', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const budget = new RetryBudget({ ratio: 0, minPerSecond: 0.1, window: '10s' })
     const policy = Tenace.policy().withRetry({ retries: 1, delay: 0, budget })
     const attempts = async () => {
@@ -504,12 +505,12 @@ test.group('Retry | budget', () => {
 
     assert.equal(await attempts(), 2)
     assert.equal(await attempts(), 1)
-    await clock.advance('10s')
+    await time.advanceBy('10s')
     assert.equal(await attempts(), 2)
 
     // a clock behind the one that started the window starts a new one
     const { fn, calls } = flaky(10)
-    await policy.settle(fn, { clock: new TestClock() })
+    await policy.settle(fn, { clock: fakeClock().clock })
     assert.equal(calls.length, 2)
   })
 

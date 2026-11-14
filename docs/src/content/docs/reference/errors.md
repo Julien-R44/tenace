@@ -5,19 +5,24 @@ description: Every error class Tenace produces, with its tag, code, and fields.
 
 Every error extends `TenaceError` and has a literal `_tag`, a stable `code`, and a `name` equal to the class name. Import them from `@julr/tenace`.
 
-| Class                  | `_tag` and `code`                             | Produced by                                     | Fields                    |
-| ---------------------- | --------------------------------------------- | ----------------------------------------------- | ------------------------- |
-| `UnexpectedError`      | `UnexpectedError`, `E_UNEXPECTED`             | any throw                                       | `cause`: the thrown value |
-| `TimeoutError`         | `TimeoutError`, `E_TIMEOUT`                   | [Timeout](/strategies/timeout/)                 | `timeoutMs`               |
-| `CircuitOpenError`     | `CircuitOpenError`, `E_CIRCUIT_OPEN`          | [Circuit breaker](/strategies/circuit-breaker/) | `state`, `retryAfterMs`   |
-| `BulkheadFullError`    | `BulkheadFullError`, `E_BULKHEAD_FULL`        | [Bulkhead](/strategies/bulkhead/)               | `running`, `queued`       |
-| `RateLimitError`       | `RateLimitError`, `E_RATE_LIMIT`              | [Rate limit](/strategies/rate-limit/)           | `key`, `retryAfterMs`     |
-| `LockNotAcquiredError` | `LockNotAcquiredError`, `E_LOCK_NOT_ACQUIRED` | [Lock](/strategies/lock/)                       | `key`                     |
-| `ChaosError`           | `ChaosError`, `E_CHAOS`                       | [Chaos](/strategies/chaos/), thrown             | none                      |
+| Class                  | `_tag` and `code`                             | Produced by                                                    | Fields                              |
+| ---------------------- | --------------------------------------------- | -------------------------------------------------------------- | ----------------------------------- |
+| `UnexpectedError`      | `UnexpectedError`, `E_UNEXPECTED`             | any throw                                                      | `cause`: the thrown value           |
+| `TimeoutError`         | `TimeoutError`, `E_TIMEOUT`                   | [Timeout](/strategies/timeout/), `clock.waitFor`, `clock.poll` | `timeoutMs`                         |
+| `CancelledError`       | `CancelledError`, `E_CANCELLED`               | external cancellation of `clock.waitFor` or `clock.poll`       | `cause`: the caller's signal reason |
+| `CircuitOpenError`     | `CircuitOpenError`, `E_CIRCUIT_OPEN`          | [Circuit breaker](/strategies/circuit-breaker/)                | `state`, `retryAfterMs`             |
+| `BulkheadFullError`    | `BulkheadFullError`, `E_BULKHEAD_FULL`        | [Bulkhead](/strategies/bulkhead/)                              | `running`, `queued`                 |
+| `RateLimitError`       | `RateLimitError`, `E_RATE_LIMIT`              | [Rate limit](/strategies/rate-limit/)                          | `key`, `retryAfterMs`               |
+| `LockNotAcquiredError` | `LockNotAcquiredError`, `E_LOCK_NOT_ACQUIRED` | [Lock](/strategies/lock/)                                      | `key`                               |
+| `ChaosError`           | `ChaosError`, `E_CHAOS`                       | [Chaos](/strategies/chaos/), thrown                            | none                                |
 
 ## UnexpectedError
 
 `UnexpectedError` wraps anything your function threw. Its `cause` holds the raw value and its `message` copies the message of the cause. `execute()` rejects with the cause itself, and `settle()` returns the `UnexpectedError`. A failure inside a strategy that is not a bug, such as a lock provider that cannot reach Redis, is an `UnexpectedError` too.
+
+## CancelledError
+
+`clock.waitFor()` and `clock.poll()` return this error when their caller signal aborts, including before the first observation. The original `signal.reason` remains in `cause`. Their own deadline produces `TimeoutError` instead. Exceptions and invalid arguments produce `UnexpectedError`. This distinction does not change the cancellation contract of `policy.settle()`.
 
 ## CircuitOpenError
 

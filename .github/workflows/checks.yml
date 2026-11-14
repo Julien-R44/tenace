@@ -78,6 +78,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:workerd
+      - run: pnpm test:workerd:native
 
   package:
     runs-on: ubuntu-latest

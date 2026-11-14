@@ -1,4 +1,4 @@
-import { type Clock, systemClock } from './clock.ts'
+import { type Clock, clock } from './clock/clock.ts'
 import { type ExecutionScope, noopScope, type TenaceEvent } from './instrumentation.ts'
 
 /**
@@ -60,7 +60,7 @@ export class ExecutionContext implements Context {
   constructor(init: ExecutionContextInit) {
     this.signal = init.signal
     this.attempt = init.attempt ?? 1
-    this.clock = init.clock ?? systemClock
+    this.clock = init.clock ?? clock
     this.scope = init.scope ?? noopScope
     this.key = init.key
     this.idempotent = init.idempotent ?? true

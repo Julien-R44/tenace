@@ -1,4 +1,4 @@
-import { type Clock, systemClock } from '../../clock.ts'
+import { type Clock, clock } from '../../clock/clock.ts'
 import type { ExecutionContext } from '../../context.ts'
 import { type Duration, toMs } from '../../duration.ts'
 import { CircuitOpenError, UnexpectedError } from '../../errors.ts'
@@ -78,7 +78,8 @@ export interface CircuitBreakerOptions {
     | undefined
   readonly store?: CircuitBreakerStore | undefined
   /**
-   * Clock for open durations and windows. Defaults to the system clock, not the clock of
+   * Clock for open durations and windows, read with `now()` so a shared store gets
+   * timestamps every instance agrees on. Defaults to the shared `clock`, not the clock of
    * the execution: the circuit is shared by every execution using it.
    */
   readonly clock?: Clock | undefined
@@ -210,7 +211,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
       },
     }
     this.#store = options.store ?? new MemoryCircuitBreakerStore()
-    this.#clock = options.clock ?? systemClock
+    this.#clock = options.clock ?? clock
     this.#classify = options.classify ?? defaultClassify
     this.#onStateChange = options.onStateChange
   }
@@ -219,7 +220,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
    * Current state, as known by the store. Synchronous with the memory store.
    */
   get state(): CircuitState {
-    const state = this.#store.state(this.#clock.now(), this.config)
+    const state = this.#store.state(this.#clock.now().epochMilliseconds, this.config)
     if (isThenable(state)) {
       throw new TypeError('This store is asynchronous, use `await breaker.getState()`')
     }
@@ -227,7 +228,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
   }
 
   async getState(): Promise<CircuitState> {
-    return this.#store.state(this.#clock.now(), this.config)
+    return this.#store.state(this.#clock.now().epochMilliseconds, this.config)
   }
 
   /**
@@ -249,7 +250,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
   async execute(context: ExecutionContext, next: Next): Promise<Result.Any> {
     let admission: Admission
     try {
-      const admitted = this.#store.admit(this.#clock.now(), this.config)
+      const admitted = this.#store.admit(this.#clock.now().epochMilliseconds, this.config)
       // the memory store is synchronous: awaiting its values costs microtask hops on every call
       admission = isThenable(admitted) ? await admitted : admitted
     } catch (error) {
@@ -273,7 +274,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
         const recorded = this.#store.record(
           admission.ticket,
           outcome,
-          this.#clock.now(),
+          this.#clock.now().epochMilliseconds,
           this.config,
         )
         if (isThenable(recorded)) await recorded
@@ -300,7 +301,7 @@ export class CircuitBreaker extends Strategy<CircuitOpenError> {
     const read = ++this.#reads
     let state: MaybePromise<CircuitState>
     try {
-      state = this.#store.state(this.#clock.now(), this.config)
+      state = this.#store.state(this.#clock.now().epochMilliseconds, this.config)
     } catch (error) {
       reportError(error)
       return

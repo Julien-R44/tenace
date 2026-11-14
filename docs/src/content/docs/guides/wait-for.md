@@ -1,79 +1,165 @@
 ---
 title: Wait for a condition
-description: Poll a condition until it is true, with an interval, a timeout, and cancellation.
+description: Wait for a boolean condition or poll for a value, with typed errors and cancellation.
 ---
 
-`waitFor(condition, options)` calls `condition` until it returns `true`, then resolves. Use it to wait for a service to start, a job to finish, or a queue to drain.
+Use `clock.waitFor()` to wait for a boolean condition, such as a service becoming healthy. Use `clock.poll()` to retrieve a value, such as a completed job.
+
+Both methods return a `Result`, including on timeout, cancellation, or an exception. Check the Result before continuing. To propagate a failure by throwing, call `Result.unwrap()` explicitly.
+
+## Wait for a service to start
 
 ```ts
-import { waitFor } from '@julr/tenace'
+import { clock, Result } from '@julr/tenace'
 
 declare const healthUrl: string
 
-await waitFor(
-  async ({ signal }) => {
-    const response = await fetch(healthUrl, { signal })
-    return response.ok
-  },
-  { interval: '500ms', timeout: '30s' },
-)
+const healthy = await clock.waitFor(async ({ signal }) => (await fetch(healthUrl, { signal })).ok, {
+  timeout: '30s',
+  interval: '500ms',
+})
+
+Result.unwrap(healthy)
+// Continue startup only after the service is healthy.
 ```
 
-`Tenace.waitFor` is the same function.
+The first check runs immediately. A false condition tries again after `interval`. The next check starts after the previous one finishes, so checks never overlap. Options are optional: the timeout defaults to 10 seconds and the interval to 100ms.
 
-## Options
+Pass the provided `signal` to `fetch` and other cancellable operations. The timeout covers the whole call, including a check that ignores its signal. Results that arrive after timeout or cancellation are ignored.
 
-| Option     | Type                                | Default        | Description                                                                   |
-| ---------- | ----------------------------------- | -------------- | ----------------------------------------------------------------------------- |
-| `interval` | `Duration \| (attempt) => Duration` | `100ms`        | Delay between two checks, 1ms at least. See [Intervals](#intervals).          |
-| `timeout`  | `Duration`                          | `10s`          | Longest wait, from the call. `Infinity` waits until the signal aborts.        |
-| `signal`   | `AbortSignal`                       |                | Stops waiting.                                                                |
-| `clock`    | `Clock`                             | the system one | Clock of the delays and the timeout, such as a [TestClock](/guides/testing/). |
+## Retrieve a completed job
 
-## How it ends
-
-The first check runs right away. Each next check starts `interval` after the previous one returned. `waitFor` then:
-
-- resolves when `condition` returns `true`;
-- rejects with a [`TimeoutError`](/reference/errors/) when the timeout elapses, even during a check;
-- rejects with `signal.reason` when the signal aborts. `condition` is not called when the signal is already aborted;
-- rejects with the error of `condition` when it throws or rejects;
-- rejects with a `TypeError` when `condition` returns something other than a boolean.
-
-`condition` receives a [context](/concepts/cancellation/) with a `signal` and the 1-based `attempt` of the check. The signal aborts when the wait ends, so a check still running when the timeout fires can stop: pass the signal to `fetch` and friends.
-
-An invalid `interval` or `timeout` rejects with a `RangeError`.
-
-## Intervals
-
-`interval` accepts a duration, or a function of the number of checks done so far. A backoff from `backoff` works, to check often at first and less often later:
+Return the observation directly and put the acceptance condition in `until`. The predicate receives the unwrapped value, including when the observation returns a `Result`.
 
 ```ts
-import { backoff, waitFor } from '@julr/tenace'
+import { clock, Result } from '@julr/tenace'
 
-declare function isJobDone(jobId: string): Promise<boolean>
+declare const jobs: {
+  find(id: string, options: { signal: AbortSignal }): Promise<{ done: boolean; output: string }>
+}
 
-await waitFor(() => isJobDone('job-1'), {
-  interval: backoff.exponential({ base: '100ms', max: '5s', jitter: 'none' }),
+const completed = await clock.poll(({ signal }) => jobs.find('job-1', { signal }), {
+  until: job => job.done,
   timeout: '2m',
+  interval: '500ms',
+})
+
+console.log(Result.unwrap(completed).output)
+```
+
+`until` is required and returns a boolean, synchronously or asynchronously. The timeout also bounds an asynchronous predicate. No observation is a sentinel. `0`, `false`, `null`, and `undefined` are valid values, so waiting for a queue to empty needs no special conversion:
+
+```ts
+import { clock, Result } from '@julr/tenace'
+
+declare const queue: { pendingCount(): Promise<number> }
+
+const empty = await clock.poll(() => queue.pendingCount(), { until: count => count === 0 })
+console.log(Result.unwrap(empty)) // 0
+```
+
+## Preserve errors returned by your service
+
+A `Result.err(error)` ends the operation immediately. Tenace preserves the business error and its inferred type, without wrapping it or nesting Results. `Result.ok(false)` keeps waiting; `Result.ok(true)` completes `waitFor()` with `Result.ok()`.
+
+```ts
+import { clock, type Context, Result, TenaceError } from '@julr/tenace'
+
+class DeploymentGone extends TenaceError {
+  readonly _tag = 'DeploymentGone' as const
+  readonly code = 'E_DEPLOYMENT_GONE' as const
+}
+
+declare const deployment: {
+  isHealthy(context: Context): Promise<Result<boolean, DeploymentGone>>
+}
+
+const healthy = await clock.waitFor(context => deployment.isHealthy(context))
+// Result<void, DeploymentGone | TimeoutError | CancelledError | UnexpectedError>
+
+Result.match(healthy, {
+  ok: () => console.log('healthy'),
+  DeploymentGone: error => console.error('deployment was deleted', error),
+  TimeoutError: error => console.error('health check timed out', error.timeoutMs),
+  CancelledError: error => console.error('startup was cancelled', error.cause),
+  UnexpectedError: error => console.error('health check failed', error.cause),
 })
 ```
 
-## Treat errors as not ready
+Exceptions thrown by a callback, rejected promises, and invalid arguments produce `UnexpectedError` with the original cause. An elapsed polling timeout produces `TimeoutError`. External cancellation produces `CancelledError` with `signal.reason` in `cause`, even when the caller aborted with a timeout error.
 
-A throwing `condition` ends the wait. When an error means "not ready yet", such as a database that refuses connections while it starts, catch it and return `false`:
+An already aborted signal returns a failed Result without calling the observation. This contract belongs to `waitFor()` and `poll()`; it does not change cancellation of `policy.settle()`.
+
+## Increase the interval between attempts
+
+Use a backoff when a remote API should be checked less often over time. Both the callback context and the interval function receive an attempt number starting at 1.
 
 ```ts
-import { waitFor } from '@julr/tenace'
+import { backoff, clock, Result } from '@julr/tenace'
 
 declare const db: { ping(): Promise<void> }
 
-await waitFor(
+const connected = await clock.waitFor(
   () =>
     db.ping().then(
       () => true,
       () => false,
     ),
-  { interval: '500ms', timeout: '1m' },
+  {
+    timeout: '1m',
+    interval: backoff.exponential({ base: '100ms', max: '5s', jitter: 'none' }),
+  },
 )
+Result.unwrap(connected)
 ```
+
+Catch an error inside the callback only when that error means "not ready yet". Otherwise, return a business error or let Tenace capture the exception.
+
+Intervals shorter than 1ms become 1ms. The last pause is cut to the deadline. `timeout: Infinity` disables expiration; cancellation still works. A zero timeout permits one immediate check but never a second one.
+
+## Keep returned resources usable
+
+`waitFor()` aborts its internal signal on every exit, success included. `poll()` leaves that signal live on success so you can read a returned `Response` body. Its deadline is still disposed, and an external caller signal remains linked to the resource.
+
+```ts
+import { clock, Result } from '@julr/tenace'
+
+declare const url: string
+declare const caller: AbortController
+
+const response = await clock.poll(({ signal }) => fetch(url, { signal }), {
+  until: response => response.ok,
+  timeout: '30s',
+  signal: caller.signal,
+})
+
+const body = await Result.unwrap(response).text()
+```
+
+The timeout bounds `poll()` itself, not the later body read. Detached tasks and later resource use are outside its Result guarantee. Dispose resources from observations you do not retain.
+
+## Migrate the previous waitFor helper
+
+For all Clock API changes, including `TestClock`, timestamps, and callback timers, follow the [v2 to v3 migration guide](/guides/migrate-clock/).
+
+Before:
+
+```ts nocheck
+import { waitFor } from '@julr/tenace'
+
+await waitFor(() => isReady(), { timeout: '30s', interval: '500ms' })
+```
+
+After:
+
+```ts
+import { clock, Result } from '@julr/tenace'
+
+declare function isReady(): Promise<boolean>
+
+Result.unwrap(await clock.waitFor(() => isReady(), { timeout: '30s', interval: '500ms' }))
+```
+
+The standalone `waitFor` and `Tenace.waitFor` are removed. The new method returns a Result instead of rejecting. Keep the Result to handle failures explicitly, or unwrap it to preserve failure propagation. To use an isolated clock, call that instance's `waitFor()` rather than passing a `clock` option.
+
+The pauses and the deadline follow the clock. A [fake clock](/guides/testing/) drives them in tests. See the [Clock reference](/reference/api/#clock) for option types.

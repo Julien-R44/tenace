@@ -1,4 +1,4 @@
-import type { Clock } from '../clock.ts'
+import type { Clock } from '../clock/clock.ts'
 
 const { setImmediate } = globalThis as { setImmediate?: (callback: () => void) => unknown }
 
@@ -15,7 +15,7 @@ export const macrotask: (callback: () => void) => void = setImmediate
 const yields = new Set<Promise<void>>()
 
 /**
- * Yields of `yieldToEventLoop` that did not resolve yet, so a `TestClock` lets the code
+ * Yields of `yieldToEventLoop` that did not resolve yet, so a `FakeClock` lets the code
  * that yielded go on before it decides which timer is next.
  */
 export function pendingYields(): ReadonlySet<Promise<void>> {
@@ -45,21 +45,8 @@ export function yieldToEventLoop(): Promise<void> {
 export function sleep(clock: Clock, ms: number, signal?: AbortSignal): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false)
   if (!(ms > 0)) return Promise.resolve(true)
-  if (ms === Number.POSITIVE_INFINITY) {
-    return new Promise(resolve =>
-      signal?.addEventListener('abort', () => resolve(false), { once: true }),
-    )
-  }
-
-  return new Promise(resolve => {
-    const onAbort = (): void => {
-      clock.clearTimeout(handle)
-      resolve(false)
-    }
-    const handle = clock.setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort)
-      resolve(true)
-    }, ms)
-    signal?.addEventListener('abort', onAbort, { once: true })
-  })
+  return clock.wait(ms, signal).then(
+    () => true,
+    () => false,
+  )
 }

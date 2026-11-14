@@ -9,7 +9,7 @@ import { Dedupe } from '../src/strategies/dedupe.ts'
 import { Lock, type LockProvider, MemoryLockProvider } from '../src/strategies/lock.ts'
 import { MemoryRateLimitStore, RateLimit } from '../src/strategies/rate_limit.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 
@@ -30,7 +30,7 @@ function recorder() {
 
 test.group('RateLimit', () => {
   test('allows `limit` calls per window, then rejects with retryAfterMs', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy().withRateLimit({ limit: 2, per: '1s', clock })
     assert.deepEqual(await policy.settle(() => 1), Result.ok(1))
     assert.deepEqual(await policy.settle(() => 2), Result.ok(2))
@@ -39,44 +39,44 @@ test.group('RateLimit', () => {
     assert.isTrue(!rejected.ok && rejected.error instanceof RateLimitError)
     assert.equal((rejected as { error: RateLimitError }).error.retryAfterMs, 500)
 
-    await clock.advance(500)
+    await time.advanceBy(500)
     assert.deepEqual(await policy.settle(() => 4), Result.ok(4))
   })
 
   test('counts each key separately', async ({ assert }) => {
-    const policy = Tenace.policy().withRateLimit({ limit: 1, per: '1m', clock: new TestClock() })
+    const policy = Tenace.policy().withRateLimit({ limit: 1, per: '1m', clock: fakeClock().clock })
     assert.isTrue((await policy.settle(() => 1, { key: 'a' })).ok)
     assert.isTrue((await policy.settle(() => 1, { key: 'b' })).ok)
     assert.isFalse((await policy.settle(() => 1, { key: 'a' })).ok)
   })
 
   test('maxWait waits for a slot instead of rejecting', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy().withRateLimit({ limit: 1, per: 100, maxWait: 150, clock })
     await policy.settle(() => 1, { clock })
-    const waiting = policy.settle(() => clock.now(), { clock })
-    await clock.advance(100)
+    const waiting = policy.settle(() => clock.monotonic(), { clock })
+    await time.advanceBy(100)
     assert.deepEqual(await waiting, Result.ok(100))
   })
 
   test('waits on its own clock when it has one', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy().withRateLimit({ limit: 1, per: '1m', maxWait: '2m', clock })
     await policy.settle(() => 1)
-    const waiting = policy.settle(() => clock.now())
-    await clock.advance('1m')
+    const waiting = policy.settle(() => clock.monotonic())
+    await time.advanceBy('1m')
     const late = new Promise(resolve => setTimeout(resolve, 50, 'still waiting'))
     assert.deepEqual(await Promise.race([waiting, late]), Result.ok(60_000))
   })
 
   test('an outer retry waits retryAfterMs', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy()
       .withRateLimit({ limit: 1, per: '1s', clock })
       .withRetry({ retries: 1, delay: 0 })
     await policy.settle(() => 'first', { clock })
-    const retried = policy.settle(() => clock.now(), { clock })
-    await clock.advance(1000)
+    const retried = policy.settle(() => clock.monotonic(), { clock })
+    await time.advanceBy(1000)
     assert.deepEqual(await retried, Result.ok(1000))
   })
 
@@ -123,7 +123,7 @@ test.group('RateLimit', () => {
   test('a denial without a positive wait is rejected right away, never asked again', async ({
     assert,
   }) => {
-    const clock = new TestClock(1.7e12)
+    const { clock } = fakeClock(1.7e12)
     for (const [retryAfterMs, maxWait] of [
       [0, '1s'],
       [-1, '1s'],
@@ -164,12 +164,12 @@ test.group('RateLimit', () => {
   test('uses the clock of the execution and returns the abort while waiting', async ({
     assert,
   }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const limit = new RateLimit({ limit: 1, per: 100, maxWait: 100 })
     const policy = Tenace.policy().with(limit)
     await policy.settle(() => 1, { clock })
-    const waiting = policy.settle(() => clock.now(), { clock })
-    await clock.advance(100)
+    const waiting = policy.settle(() => clock.monotonic(), { clock })
+    await time.advanceBy(100)
     assert.deepEqual(await waiting, Result.ok(100))
 
     const controller = new AbortController()
@@ -232,13 +232,13 @@ test.group('Lock', () => {
   })
 
   test('rejects with LockNotAcquiredError after the timeout', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const lock = new Lock({ timeout: 50 })
     const policy = Tenace.policy().with(lock)
     const gate = deferred<void>()
     const holder = policy.settle(() => gate.promise, { key: 'k', clock })
     const waiting = policy.settle(() => 'never', { key: 'k', clock })
-    await clock.advance(50)
+    await time.advanceBy(50)
     const result = await waiting
     assert.isTrue(!result.ok && result.error instanceof LockNotAcquiredError)
     gate.resolve()
@@ -496,12 +496,12 @@ test.group('Cache', () => {
 
 test.group('StaleFallback', () => {
   test('serves the last success of the key when the call fails', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const { events, instrumentation } = recorder()
     const policy = Tenace.policy({ instrumentation }).withStaleFallback()
     assert.equal(await policy.execute(() => 'fresh', { key: 'a', clock }), 'fresh')
 
-    await clock.advance(1000)
+    await time.advanceBy(1000)
     assert.equal(await policy.execute(() => Result.err('down'), { key: 'a', clock }), 'fresh')
     assert.deepEqual(events, [{ type: 'fallback.stale', key: 'a', ageMs: 1000 }])
     await assert.rejects(() => policy.execute(() => Result.err('down'), { key: 'b', clock }))
@@ -513,10 +513,10 @@ test.group('StaleFallback', () => {
   })
 
   test('maxAge and maxEntries bound what can be served', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy().withStaleFallback({ maxAge: 100, maxEntries: 1 })
     await policy.execute(() => 'a', { key: 'a', clock })
-    await clock.advance(101)
+    await time.advanceBy(101)
     assert.isFalse((await policy.settle(() => Result.err('down'), { key: 'a', clock })).ok)
 
     await policy.execute(() => 'a', { key: 'a', clock })

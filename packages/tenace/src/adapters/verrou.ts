@@ -1,4 +1,4 @@
-import { systemClock } from '../clock.ts'
+import { clock as sharedClock } from '../clock/clock.ts'
 import { type Duration, toMs } from '../duration.ts'
 import { sleep } from '../internal/sleep.ts'
 import type { LockAcquireOptions, LockLease, LockProvider } from '../strategies/lock.ts'
@@ -45,13 +45,13 @@ export function verrou(factory: VerrouLike, options: VerrouAdapterOptions = {}):
 
   return {
     async acquire(key: string, options: LockAcquireOptions): Promise<LockLease | undefined> {
-      const { signal, timeoutMs, clock = systemClock } = options
+      const { signal, timeoutMs, clock = sharedClock } = options
       const lock = factory.createLock(key, options.ttlMs)
-      const deadline = clock.now() + (timeoutMs ?? Number.POSITIVE_INFINITY)
+      const deadline = clock.monotonic() + (timeoutMs ?? Number.POSITIVE_INFINITY)
 
       while (!signal.aborted) {
         if (await lock.acquireImmediately()) return { release: () => lock.release() }
-        const remainingMs = deadline - clock.now()
+        const remainingMs = deadline - clock.monotonic()
         if (remainingMs <= 0) return undefined
         await sleep(clock, Math.min(retryDelayMs, remainingMs), signal)
       }

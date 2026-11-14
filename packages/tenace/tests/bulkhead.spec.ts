@@ -5,7 +5,7 @@ import { BulkheadFullError, UnexpectedError } from '../src/errors.ts'
 import { Result } from '../src/result/namespace.ts'
 import { Bulkhead } from '../src/strategies/bulkhead.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 
 /**
  * Calls that stay pending until released one by one.
@@ -76,20 +76,20 @@ test.group('Bulkhead', () => {
   })
 
   test('a call waiting longer than maxWait is rejected', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy().withBulkhead({ concurrency: 1, queue: 1, maxWait: 100 })
     const calls = gate()
 
     const first = policy.settle(calls.fn, { clock })
     const waiting = policy.settle(calls.fn, { clock })
-    await clock.advance(100)
+    await time.advanceBy(100)
     const result = await waiting
     assert.isTrue(!result.ok && result.error instanceof BulkheadFullError)
     assert.deepEqual(calls.started, [1])
 
     await calls.releaseNext()
     assert.deepEqual(await first, Result.ok(1))
-    assert.equal(clock.pendingTimers, 0)
+    assert.equal(time.pendingTimers, 0)
   })
 
   test('an aborted queued call leaves the queue', async ({ assert }) => {
@@ -142,7 +142,7 @@ test.group('Bulkhead', () => {
   })
 
   test('an inner bulkhead aborted by an outer timeout returns', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const policy = Tenace.policy()
       .withBulkhead({ concurrency: 1, queue: 1 })
       .withTimeout(50, { mode: 'cooperative' })
@@ -150,7 +150,7 @@ test.group('Bulkhead', () => {
 
     void policy.settle(calls.fn, { clock })
     const queued = policy.settle(calls.fn, { clock })
-    await clock.advance(50)
+    await time.advanceBy(50)
     const result = await queued
     assert.isFalse(result.ok)
     assert.notInstanceOf((result as { error: unknown }).error, UnexpectedError)

@@ -3,7 +3,7 @@ import { test } from '@japa/runner'
 import { TimeoutError, UnexpectedError } from '../src/errors.ts'
 import { Result } from '../src/result/namespace.ts'
 import { Tenace } from '../src/tenace.ts'
-import { TestClock } from '../src/testing/test_clock.ts'
+import { fakeClock } from './helpers/fake_clock.ts'
 import { BoomError, Explode, NotFound } from './helpers/strategies.ts'
 
 const fail = () => {
@@ -76,12 +76,12 @@ test.group('Fallback', () => {
   })
 
   test('a fallback after a timeout handles it', async ({ assert }) => {
-    const clock = new TestClock()
+    const { clock, time } = fakeClock()
     const done = Tenace.policy()
       .withTimeout(100)
       .withFallbackOn(['TimeoutError'], error => error.timeoutMs)
       .execute(() => new Promise(() => {}), { clock })
-    await clock.advance(100)
+    await time.advanceBy(100)
     assert.equal(await done, 100)
   })
 
